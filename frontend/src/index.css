@@ -868,16 +868,16 @@ tr:last-child td {
 }
 /* ===== ATTENDANCE PAGE ANIMATIONS ===== */
 
-/* ─── Status Pop (old school scale bounce) ─── */
-@keyframes statusPop {
+/* ─── Status Change: shrink → swap → grow ─── */
+@keyframes statusChange {
   0%   { transform: scale(1); }
-  35%  { transform: scale(1.18); }
-  70%  { transform: scale(0.94); }
+  45%  { transform: scale(0.85); }
+  55%  { transform: scale(0.85); }
   100% { transform: scale(1); }
 }
 
-.status-pop {
-  animation: statusPop 0.32s cubic-bezier(0.34, 1.8, 0.64, 1);
+.status-changing {
+  animation: statusChange 0.26s ease both;
 }
 
 /* ─── Stat Number Bump ─── */
@@ -895,30 +895,16 @@ tr:last-child td {
   animation: statBump 0.3s cubic-bezier(0.34, 1.8, 0.64, 1);
 }
 
-/* ─── Row Entrance (staggered via nth-child, plays once on mount) ─── */
-@keyframes rowEnter {
-  from { opacity: 0; transform: translateX(-14px); }
-  to   { opacity: 1; transform: translateX(0); }
+/* ─── Row Entrance: exact same as TaskManager subject chips ─── */
+@keyframes rowChipPop {
+  0%   { opacity: 0; transform: scale(0.6); }
+  70%  { transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 .attendance-row {
   opacity: 0;
-  animation: rowEnter 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  transition: background 0.25s ease, transform 0.25s var(--ease-butter);
-}
-
-.attendance-row:hover {
-  transform: translateX(3px);
-}
-
-.attendance-row:hover .attendance-row-number {
-  color: var(--accent);
-  transform: scale(1.12);
-}
-
-.attendance-row-number {
-  display: inline-block;
-  transition: all 0.2s var(--ease-spring);
+  animation: rowChipPop 0.4s var(--ease-spring) forwards;
 }
 
 /* Stagger delays (0–30 rows) */
@@ -953,16 +939,6 @@ tr:last-child td {
 .attendance-row:nth-child(29) { animation-delay: 0.84s; }
 .attendance-row:nth-child(30) { animation-delay: 0.87s; }
 
-/* ─── Row Flash (when status clicked) ─── */
-@keyframes rowFlash {
-  0%   { background: rgba(79, 125, 243, 0.08); }
-  100% { background: transparent; }
-}
-
-.row-flash {
-  animation: rowFlash 0.5s ease forwards;
-}
-
 /* ─── Attendance Bar ─── */
 .attendance-bar-track {
   height: 6px;
@@ -996,11 +972,6 @@ tr:last-child td {
 /* ─── Status Pill ─── */
 .pill-attendance {
   min-width: 90px;
-  transition: transform 0.2s var(--ease-spring), box-shadow 0.2s ease;
-}
-
-.pill-attendance:active {
-  transform: scale(0.96);
 }
 
 /* ─── Summary Chips ─── */
@@ -1098,4 +1069,188 @@ tr:last-child td {
 
 .mark-all-btn:hover::before {
   opacity: 1;
+}
+/* ===== MARKS PAGE STYLES ===== */
+
+.mark-display {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.5);
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.mark-avg-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 12px;
+  min-width: 44px;
+}
+
+.mark-pass {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #065f46;
+}
+
+.mark-fail {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 31, 54, 0.35);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 1100px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: modalPop 0.35s var(--ease-spring);
+}
+
+@keyframes modalPop {
+  0%   { opacity: 0; transform: scale(0.92) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.modal-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(0,0,0,0.04);
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: rgba(0,0,0,0.08);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.marks-grid-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.3);
+}
+
+.marks-grid-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.marks-grid-table thead th {
+  padding: 12px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.5);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  white-space: nowrap;
+}
+
+.marks-grid-table tbody td {
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+
+.marks-grid-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.marks-grid-table tbody tr:hover td {
+  background: rgba(79, 125, 243, 0.03);
+}
+
+.mark-input {
+  width: 72px;
+  height: 38px;
+  padding: 0 8px;
+  border: 1.5px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.6);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.mark-input:focus {
+  border-color: var(--subject-color, var(--accent));
+  box-shadow: 0 0 0 3px rgba(79, 125, 243, 0.1);
+  background: white;
+}
+
+.mark-input:hover {
+  border-color: rgba(0,0,0,0.15);
+}
+
+.mark-input::-webkit-outer-spin-button,
+.mark-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.mark-input[type=number] {
+  -moz-appearance: textfield;
 }

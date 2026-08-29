@@ -9,6 +9,7 @@ const allNavGroups = [
     items: [
       { path: '/teacher/attendance', label: 'Attendance', icon: '📋' },
       { path: '/teacher/tasks', label: 'Tasks', icon: '✅' },
+      { path: '/teacher/marks', label: 'Marks', icon: '📝' },
       { path: '/class-teacher/report', label: 'Class Report', icon: '📊' },
     ]
   },

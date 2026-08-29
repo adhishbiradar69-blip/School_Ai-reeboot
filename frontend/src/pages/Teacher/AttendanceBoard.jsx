@@ -71,8 +71,7 @@ export default function AttendanceBoard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
-  const [poppingId, setPoppingId] = useState(null);
-  const [flashId, setFlashId] = useState(null);
+  const [shrinkingId, setShrinkingId] = useState(null);
   const [dateChanging, setDateChanging] = useState(false);
 
   const timeoutsRef = useRef([]);
@@ -116,11 +115,7 @@ export default function AttendanceBoard() {
   };
 
   const toggleStatus = useCallback((id) => {
-    setPoppingId(id);
-    setFlashId(id);
-    queueTimeout(() => setPoppingId(null), 320);
-    queueTimeout(() => setFlashId(null), 550);
-
+    setShrinkingId(id);
     setStudents(prev => prev.map(s => {
       if (s.id === id) {
         const cycle = { 'P': 'A', 'A': 'L', 'L': 'P' };
@@ -128,6 +123,7 @@ export default function AttendanceBoard() {
       }
       return s;
     }));
+    queueTimeout(() => setShrinkingId(null), 260);
   }, []);
 
   const markAll = (status) => {
@@ -375,19 +371,19 @@ export default function AttendanceBoard() {
             </tr>
           </thead>
           <tbody key={`tbody-${date}`}>
-            {students.map((s, i) => (
+            {students.map((s) => (
               <tr
                 key={s.id}
-                className={`attendance-row ${flashId === s.id ? 'row-flash' : ''}`}
+                className="attendance-row"
               >
                 <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13 }}>
-                  <span className="attendance-row-number">{i + 1}</span>
+                  <span className="attendance-row-number">{s.id}</span>
                 </td>
                 <td style={{ fontWeight: 600, fontSize: 15 }}>{s.name}</td>
                 <td style={{ textAlign: 'center' }}>
                   <button
                     onClick={() => toggleStatus(s.id)}
-                    className={`pill pill-attendance ${getStatusClass(s.status)} ${poppingId === s.id ? 'status-pop' : ''}`}
+                    className={`pill pill-attendance ${getStatusClass(s.status)} ${shrinkingId === s.id ? 'status-changing' : ''}`}
                   >
                     <span style={{ marginRight: 4 }}>{getStatusIcon(s.status)}</span>
                     {getStatusLabel(s.status)}

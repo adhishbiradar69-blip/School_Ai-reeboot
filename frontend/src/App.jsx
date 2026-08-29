@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import AttendanceBoard from './pages/Teacher/AttendanceBoard';
 import TaskManager from './pages/Teacher/TaskManager';
+import MarksBoard from './pages/Teacher/MarksBoard';
 import ClassReport from './pages/ClassTeacher/ClassReport';
 import ParentView from './pages/Parent/ChildView';
 import AdminDashboard from './pages/Admin/Dashboard';
@@ -31,6 +32,9 @@ function App() {
           } />
           <Route path="/teacher/tasks" element={
             <ProtectedRoute><TaskManager /></ProtectedRoute>
+          } />
+          <Route path="/teacher/marks" element={
+            <ProtectedRoute><MarksBoard /></ProtectedRoute>
           } />
           
           <Route path="/class-teacher/report" element={
