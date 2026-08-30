@@ -1,0 +1,143 @@
+import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EASE, SPRING } from '../lib/motion.jsx';
+
+/* Animated number that counts from previous value to next, with easing. */
+export function CountUp({ value = 0, decimals = 0, duration = 0.9, className, style }) {
+  const [display, setDisplay] = useState(0);
+  const fromRef = useRef(0);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    const to = Number(value) || 0;
+    if (from === to) { setDisplay(to); return; }
+    const start = performance.now();
+    cancelAnimationFrame(rafRef.current);
+    const tick = (now) => {
+      const t = Math.min((now - start) / (duration * 1000), 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const current = from + (to - from) * eased;
+      setDisplay(current);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+      else fromRef.current = to;
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [value, duration]);
+
+  const text = Number.isInteger(value) && decimals === 0
+    ? Math.round(display).toString()
+    : display.toFixed(decimals);
+
+  return <span className={className} style={style}>{text}</span>;
+}
+
+/* Toast with a shrinking progress bar + swipe-to-dismiss. */
+export function Toast({ message, type = 'success', onClose, duration = 2600 }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, duration);
+    return () => clearTimeout(t);
+  }, [onClose, duration]);
+
+  const colors = {
+    success: { bg: 'linear-gradient(135deg,#d4f5e9,#a8e6d3)', color: '#0d7a5e', icon: '✓' },
+    error: { bg: 'linear-gradient(135deg,#fce4e8,#f9c4cc)', color: '#b0304a', icon: '✕' },
+    info: { bg: 'linear-gradient(135deg,#dbeafe,#bfdbfe)', color: '#1e40af', icon: 'ℹ' },
+  }[type] || { bg: '#f0eeea', color: '#5a5a5a', icon: '•' };
+
+  return (
+    <div className="toast-host">
+      <motion.div
+        className="toast toast-pro"
+        initial={{ opacity: 0, y: -40, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -40, scale: 0.9 }}
+        transition={SPRING}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.4}
+        onDragEnd={(e, info) => { if (info.offset.y < -30) onClose(); }}
+        style={{ background: colors.bg, color: colors.color }}
+      >
+        <span className="toast-icon">{colors.icon}</span>
+        <span>{message}</span>
+        <div className="toast-bar">
+          <motion.div
+            className="toast-bar-fill"
+            initial={{ width: '100%' }}
+            animate={{ width: '0%' }}
+            transition={{ duration: duration / 1000, ease: 'linear' }}
+            style={{ background: colors.color }}
+          />
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/* Toast host that renders the active toast (use one per page). */
+export function ToastHost({ toast, onClose }) {
+  return (
+    <div className="toast-host-wrap">
+      <AnimatePresence>
+        {toast && <Toast key="t" message={toast.message} type={toast.type} onClose={onClose} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* Modal with backdrop fade + spring scale. */
+export function Modal({ open, onClose, children, title, wide }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.22 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className={`modal-content modal-pro ${wide ? 'modal-wide' : ''}`}
+            initial={{ opacity: 0, scale: 0.92, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 10 }}
+            transition={SPRING}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {title && (
+              <div className="modal-header">
+                <h3>{title}</h3>
+                <button onClick={onClose} className="modal-close">✕</button>
+              </div>
+            )}
+            <div className="modal-body">{children}</div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* Lightweight ripple button — tap scale + shimmer sweep already in .btn. */
+export const MotionBtn = motion.button;
+
+/* Confetti-ish success burst (CSS-only, cheap). */
+export function SuccessBurst({ show }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          className="success-burst"
+          initial={{ scale: 0, opacity: 1 }}
+          animate={{ scale: 2.4, opacity: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8, ease: EASE }}
+        />
+      )}
+    </AnimatePresence>
+  );
+}

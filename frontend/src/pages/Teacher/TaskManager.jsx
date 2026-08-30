@@ -1,14 +1,9 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
-
-function Toast({ message, type, onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 2500);
-    return () => clearTimeout(t);
-  }, [onClose]);
-  return <div className={`toast toast-${type}`}>{type === 'success' ? '✓ ' : '✕ '}{message}</div>;
-}
+import { Page, EASE, SPRING, staggerContainer, staggerItem } from '../../lib/motion.jsx';
+import { Toast } from '../../components/ui.jsx';
 
 export default function TaskManager() {
   const { user } = useAuth();
@@ -19,343 +14,199 @@ export default function TaskManager() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [expandedTask, setExpandedTask] = useState(null);
-
   const [showForm, setShowForm] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [creating, setCreating] = useState(false);
+  const showToast = (m, t = 'success') => { setToast({ message: m, type: t }); setTimeout(() => setToast(null), 2600); };
 
-  useEffect(() => {
-    if (classId) {
-      fetchTasks();
-      fetchSubjects();
-    }
-  }, [classId]);
-
-  const showToast = (message, type) => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2600);
-  };
+  useEffect(() => { if (classId) { fetchTasks(); fetchSubjects(); } }, [classId]);
 
   const fetchTasks = async () => {
     setLoading(true);
-    try {
-      const res = await api.get(`/tasks/class/${classId}`);
-      setTasks(res.data);
-    } catch (err) { console.error(err); }
+    try { const r = await api.get(`/tasks/class/${classId}`); setTasks(r.data); } catch (e) { console.error(e); }
     setLoading(false);
   };
-
   const fetchSubjects = async () => {
-    try {
-      const res = await api.get('/tasks/subjects');
-      setSubjects(res.data);
-      if (res.data.length > 0) setSelectedSubject(String(res.data[0].id));
-    } catch (err) { console.error(err); }
+    try { const r = await api.get('/tasks/subjects'); setSubjects(r.data); if (r.data.length) setSelectedSubject(String(r.data[0].id)); } catch {}
   };
 
   const createTask = async (e) => {
     e.preventDefault();
-    if (!taskTitle.trim()) {
-      showToast('Please enter a task name', 'error');
-      return;
-    }
-    if (!selectedSubject) {
-      showToast('Please select a subject', 'error');
-      return;
-    }
+    if (!taskTitle.trim()) { showToast('Please enter a task name', 'error'); return; }
+    if (!selectedSubject) { showToast('Please select a subject', 'error'); return; }
     setCreating(true);
     try {
-      await api.post('/tasks/', {
-        title: taskTitle,
-        due_date: dueDate || null,
-        class_id: classId,
-        subject_id: parseInt(selectedSubject)
-      });
-      setTaskTitle('');
-      setDueDate('');
-      setShowForm(false);
-      showToast('Task created!', 'success');
-      fetchTasks();
-    } catch (err) {
-      showToast('Failed to create task', 'error');
-    }
+      await api.post('/tasks/', { title: taskTitle, due_date: dueDate || null, class_id: classId, subject_id: parseInt(selectedSubject) });
+      setTaskTitle(''); setDueDate(''); setShowForm(false); showToast('Task created!', 'success'); fetchTasks();
+    } catch { showToast('Failed to create task', 'error'); }
     setCreating(false);
-  };
-
-  const cancelForm = () => {
-    setTaskTitle('');
-    setDueDate('');
-    setShowForm(false);
   };
 
   const toggleStatus = async (taskId, studentId, currentStatus) => {
     const next = currentStatus === 'completed' ? 'pending' : 'completed';
-    try {
-      await api.post('/tasks/status', { task_id: taskId, student_id: studentId, status: next });
-      fetchTasks();
-    } catch (err) { showToast('Update failed', 'error'); }
+    try { await api.post('/tasks/status', { task_id: taskId, student_id: studentId, status: next }); fetchTasks(); }
+    catch { showToast('Update failed', 'error'); }
   };
-
   const deleteTask = async (taskId) => {
     if (!confirm('Delete this task?')) return;
-    try {
-      await api.delete(`/tasks/${taskId}`);
-      showToast('Task deleted', 'success');
-      fetchTasks();
-      if (expandedTask === taskId) setExpandedTask(null);
-    } catch (err) { showToast('Delete failed', 'error'); }
+    try { await api.delete(`/tasks/${taskId}`); showToast('Task deleted', 'success'); fetchTasks(); if (expandedTask === taskId) setExpandedTask(null); }
+    catch { showToast('Delete failed', 'error'); }
   };
 
-  const getRate = (students) => {
-    if (!students.length) return 0;
-    return Math.round((students.filter(s => s.status === 'completed').length / students.length) * 100);
-  };
-
+  const getRate = (studs) => !studs.length ? 0 : Math.round(studs.filter(s => s.status === 'completed').length / studs.length * 100);
   const getStatusStyle = (status) => {
     if (status === 'completed') return { bg: '#d1fae5', color: '#047857', border: '#10b981', label: '✓ Done' };
     if (status === 'late') return { bg: '#fee2e2', color: '#b91c1c', border: '#ef4444', label: '✗ Late' };
     return { bg: '#f1f5f9', color: '#64748b', border: '#e2e8f0', label: '○ Pending' };
   };
 
-  if (!classId) {
-    return (
-      <div className="animate-fade" style={{ padding: 40 }}>
-        <div className="glass" style={{ textAlign: 'center', padding: 60 }}>
-          <p style={{ fontSize: 48, marginBottom: 16 }}>⚠️</p>
-          <h3 style={{ fontSize: 20, fontWeight: 700 }}>No Class Assigned</h3>
-          <p style={{ color: 'var(--text-secondary)' }}>Contact administrator.</p>
-        </div>
-      </div>
-    );
-  }
+  if (!classId) return (
+    <Page><div className="glass" style={{ textAlign: 'center', padding: 60, marginTop: 40 }}>
+      <p style={{ fontSize: 48, marginBottom: 16 }}>⚠️</p>
+      <h3 style={{ fontSize: 20, fontWeight: 700 }}>No Class Assigned</h3>
+      <p style={{ color: 'var(--text-secondary)' }}>Contact administrator.</p>
+    </div></Page>
+  );
 
-  if (loading && tasks.length === 0 && !showForm) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <p style={{ color: 'var(--text-secondary)' }}>Loading tasks...</p>
-      </div>
-    );
-  }
+  if (loading && !tasks.length && !showForm) return (
+    <Page><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+      <p style={{ color: 'var(--text-secondary)' }}>Loading tasks...</p>
+    </div></Page>
+  );
 
-  /* ========== FULL-PAGE CREATE FORM ========== */
-  if (showForm) {
-    return (
-      <div className="animate-fade">
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
-        <div className="page-header">
-          <h2>Create New Task</h2>
-          <p>Set up an assignment for your class</p>
-        </div>
-
-        <div className="glass form-card" style={{ padding: 0, maxWidth: 720 }}>
-          <div style={{ padding: '32px 36px', borderBottom: '1px solid var(--border)' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 1 }}>Task Details</h3>
-            <div className="form-header-line" style={{ maxWidth: 80 }} />
-          </div>
-
-          <form onSubmit={createTask} style={{ padding: '32px 36px' }}>
-            <div className="form-field form-field-d1" style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>Task Name *</label>
-              <input
-                type="text"
-                placeholder="e.g., Chapter 5 Exercise, Science Project..."
-                value={taskTitle}
-                onChange={e => setTaskTitle(e.target.value)}
-                className="input input-glow"
-                style={{ fontSize: 16, padding: '14px 18px' }}
-                required
-              />
-            </div>
-
-            <div className="form-field form-field-d2" style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>Subject *</label>
-              {subjects.length === 0 ? (
-                <p style={{ color: '#ef4444', fontSize: 14, fontWeight: 500 }}>
-                  No subjects found. Run <b>Seed Data</b> from Admin first.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {subjects.map((sub, i) => (
-                    <button
-                      key={sub.id}
-                      type="button"
-                      onClick={() => setSelectedSubject(String(sub.id))}
-                      className={`chip-animate chip-d${Math.min(i + 1, 6)}`}
-                      style={{
-                        padding: '10px 20px', borderRadius: 24, border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                        background: selectedSubject === String(sub.id) ? sub.color : 'rgba(255,255,255,0.6)',
-                        color: selectedSubject === String(sub.id) ? 'white' : '#64748b',
-                        transition: 'all 0.25s var(--ease-spring)',
-                        boxShadow: selectedSubject === String(sub.id) ? '0 4px 16px rgba(0,0,0,0.18)' : '0 1px 3px rgba(0,0,0,0.05)',
-                        border: selectedSubject === String(sub.id) ? 'none' : '1.5px solid var(--border-strong)',
-                        transform: selectedSubject === String(sub.id) ? 'scale(1.05)' : 'scale(1)'
-                      }}
-                    >
-                      {sub.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="form-field form-field-d3" style={{ marginBottom: 32 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>Due Date</label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={e => setDueDate(e.target.value)}
-                className="input input-glow"
-                style={{ width: 'auto', fontSize: 15, padding: '12px 18px' }}
-              />
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Optional — leave blank if no deadline</p>
-            </div>
-
-            <div className="form-field form-field-d4" style={{ display: 'flex', gap: 12 }}>
-              <button type="button" onClick={cancelForm} className="btn btn-secondary" style={{ padding: '12px 32px' }}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={creating} style={{ padding: '12px 32px' }}>
-                {creating ? 'Creating...' : '✓ Create Task'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  /* ========== TASK LIST ========== */
-  return (
-    <div className="animate-fade">
+  if (showForm) return (
+    <Page>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
-      <div className="page-header">
-        <h2>Tasks</h2>
-        <p>Assignments for your class</p>
-      </div>
-
-      <div style={{ marginBottom: 28 }}>
-        <button onClick={() => setShowForm(true)} className="btn btn-primary" style={{ padding: '12px 28px' }}>
-          + New Task
-        </button>
-      </div>
-
-      {tasks.length === 0 && (
-        <div className="glass" style={{ textAlign: 'center', padding: 60 }}>
-          <p style={{ fontSize: 48, marginBottom: 16 }}>📝</p>
-          <p style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>No tasks yet. Create one above!</p>
+      <div className="page-header"><h2>Create New Task</h2><p>Set up an assignment for your class</p></div>
+      <motion.div className="glass form-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }}
+        style={{ padding: 0, maxWidth: 720 }}>
+        <div style={{ padding: '32px 36px', borderBottom: '1px solid var(--border)' }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 1 }}>Task Details</h3>
+          <div className="form-header-line" style={{ maxWidth: 80 }} />
         </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {tasks.map((task) => {
-          const rate = getRate(task.students);
-          const isExpanded = expandedTask === task.task_id;
-          return (
-            <div key={task.task_id} className="glass animate-slide-up" style={{ padding: 0, overflow: 'hidden' }}>
-              <div
-                onClick={() => setExpandedTask(isExpanded ? null : task.task_id)}
-                style={{
-                  padding: '20px 24px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderLeft: `4px solid ${task.subject.color}`,
-                  transition: 'background 0.15s ease'
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                    <span style={{
-                      padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700,
-                      background: `${task.subject.color}15`, color: task.subject.color, textTransform: 'uppercase', letterSpacing: 0.5
-                    }}>
-                      {task.subject.name}
-                    </span>
-                    {task.due_date && (
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
-                        Due {task.due_date}
-                      </span>
-                    )}
-                  </div>
-                  <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{task.title}</h3>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: rate === 100 ? '#10b981' : task.subject.color }}>
-                      {rate}%
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
-                      Done
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteTask(task.task_id); }}
-                    style={{
-                      background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
-                      fontSize: 18, padding: 4, borderRadius: 6, transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => e.target.style.color = '#ef4444'}
-                    onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}
-                  >
-                    🗑
-                  </button>
-                  <span style={{
-                    fontSize: 20, color: 'var(--text-muted)', transition: 'transform 0.2s',
-                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
-                  }}>
-                    ▼
-                  </span>
-                </div>
+        <form onSubmit={createTask} style={{ padding: '32px 36px' }}>
+          <div className="form-field" style={{ marginBottom: 24 }}>
+            <label className="field-label">Task Name *</label>
+            <input type="text" placeholder="e.g., Chapter 5 Exercise, Science Project..." value={taskTitle}
+              onChange={e => setTaskTitle(e.target.value)} className="input input-glow" style={{ fontSize: 16, padding: '14px 18px' }} required />
+          </div>
+          <div className="form-field" style={{ marginBottom: 24 }}>
+            <label className="field-label">Subject *</label>
+            {subjects.length === 0 ? (
+              <p style={{ color: '#ef4444', fontSize: 14, fontWeight: 500 }}>No subjects found. Ask admin to configure subjects for this grade.</p>
+            ) : (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {subjects.map((sub) => (
+                  <motion.button key={sub.id} type="button" onClick={() => setSelectedSubject(String(sub.id))}
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    style={{ padding: '10px 20px', borderRadius: 24, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                      background: selectedSubject === String(sub.id) ? sub.color : 'rgba(255,255,255,0.6)',
+                      color: selectedSubject === String(sub.id) ? 'white' : '#64748b',
+                      boxShadow: selectedSubject === String(sub.id) ? '0 4px 16px rgba(0,0,0,0.18)' : '0 1px 3px rgba(0,0,0,0.05)',
+                      border: selectedSubject === String(sub.id) ? 'none' : '1.5px solid var(--border-strong)' }}>
+                    {sub.name}
+                  </motion.button>
+                ))}
               </div>
+            )}
+          </div>
+          <div className="form-field" style={{ marginBottom: 32 }}>
+            <label className="field-label">Due Date</label>
+            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="input input-glow" style={{ width: 'auto', fontSize: 15, padding: '12px 18px' }} />
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Optional — leave blank if no deadline</p>
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button type="button" onClick={() => { setTaskTitle(''); setDueDate(''); setShowForm(false); }} className="btn btn-secondary" style={{ padding: '12px 32px' }}>Cancel</button>
+            <motion.button type="submit" className="btn btn-primary" disabled={creating} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{ padding: '12px 32px' }}>
+              {creating ? 'Creating...' : '✓ Create Task'}
+            </motion.button>
+          </div>
+        </form>
+      </motion.div>
+    </Page>
+  );
 
-              {isExpanded && (
-                <div style={{ borderTop: '1px solid var(--border)', padding: '16px 24px 24px', background: '#fafafa' }}>
-                  <div className="table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Student</th>
-                          <th style={{ width: 140, textAlign: 'center' }}>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {task.students.map((s) => {
-                          const st = getStatusStyle(s.status);
-                          return (
-                            <tr key={s.id}>
-                              <td style={{ fontWeight: 600 }}>{s.name}</td>
-                              <td style={{ textAlign: 'center' }}>
-                                <button
-                                  onClick={() => toggleStatus(task.task_id, s.id, s.status)}
-                                  className="pill"
-                                  style={{
-                                    padding: '6px 18px',
-                                    fontSize: 12,
-                                    background: st.bg,
-                                    color: st.color,
-                                    border: `1.5px solid ${st.border}`,
-                                    width: 100,
-                                    fontWeight: 700
-                                  }}
-                                >
-                                  {st.label}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+  return (
+    <Page>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <div className="page-header"><h2>Tasks</h2><p>Assignments for your class</p></div>
+      <div style={{ marginBottom: 28 }}>
+        <motion.button onClick={() => setShowForm(true)} className="btn btn-primary" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{ padding: '12px 28px' }}>+ New Task</motion.button>
       </div>
-    </div>
+
+      {tasks.length === 0 ? (
+        <motion.div className="glass" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', padding: 60 }}>
+          <motion.p style={{ fontSize: 48, marginBottom: 16 }} animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}>📝</motion.p>
+          <p style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>No tasks yet. Create one above!</p>
+        </motion.div>
+      ) : (
+        <motion.div variants={staggerContainer} initial="initial" animate="animate" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {tasks.map(task => {
+            const rate = getRate(task.students);
+            const isExpanded = expandedTask === task.task_id;
+            return (
+              <motion.div key={task.task_id} variants={staggerItem} className="glass" style={{ padding: 0, overflow: 'hidden' }}>
+                <motion.div
+                  onClick={() => setExpandedTask(isExpanded ? null : task.task_id)}
+                  whileHover={{ backgroundColor: 'rgba(79,125,243,0.02)' }}
+                  style={{ padding: '20px 24px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: `4px solid ${task.subject.color}` }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                      <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: `${task.subject.color}15`, color: task.subject.color, textTransform: 'uppercase', letterSpacing: 0.5 }}>{task.subject.name}</span>
+                      {task.due_date && <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Due {task.due_date}</span>}
+                    </div>
+                    <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{task.title}</h3>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <motion.div style={{ fontSize: 24, fontWeight: 800, color: rate === 100 ? '#10b981' : task.subject.color }}
+                        key={rate} initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={SPRING}>{rate}%</motion.div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Done</div>
+                    </div>
+                    <motion.button onClick={(e) => { e.stopPropagation(); deleteTask(task.task_id); }} whileHover={{ scale: 1.2 }} whileTap={{ scale: 0.9 }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: 4, borderRadius: 6 }}>🗑</motion.button>
+                    <motion.span animate={{ rotate: isExpanded ? 180 : 0 }} transition={SPRING} style={{ fontSize: 20, color: 'var(--text-muted)' }}>▼</motion.span>
+                  </div>
+                </motion.div>
+
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.35, ease: EASE }} style={{ overflow: 'hidden' }}>
+                      <div style={{ borderTop: '1px solid var(--border)', padding: '16px 24px 24px', background: '#fafafa' }}>
+                        <div className="table-wrap">
+                          <table>
+                            <thead><tr><th>Student</th><th style={{ width: 140, textAlign: 'center' }}>Status</th></tr></thead>
+                            <tbody>
+                              {task.students.map(s => {
+                                const st = getStatusStyle(s.status);
+                                return (
+                                  <tr key={s.id}>
+                                    <td style={{ fontWeight: 600 }}>{s.name}</td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      <motion.button onClick={() => toggleStatus(task.task_id, s.id, s.status)} className="pill"
+                                        whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
+                                        style={{ padding: '6px 18px', fontSize: 12, background: st.bg, color: st.color, border: `1.5px solid ${st.border}`, width: 100, fontWeight: 700 }}>
+                                        {st.label}
+                                      </motion.button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      )}
+    </Page>
   );
 }

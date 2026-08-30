@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
+import { motion } from 'framer-motion';
+import { useAuth, homePathFor } from '../auth/AuthContext';
+import { EASE, SPRING } from '../lib/motion.jsx';
+
+const field = (delay) => ({
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5, ease: EASE, delay },
+});
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -14,16 +22,11 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
-    if (!agreed) {
-      setError('You must agree to the Terms and Conditions to continue.');
-      return;
-    }
-    
+    if (!agreed) { setError('You must agree to the Terms and Conditions to continue.'); return; }
     setLoading(true);
     try {
-      await login(email, password);
-      navigate('/teacher/attendance');
+      const user = await login(email, password);
+      navigate(homePathFor(user.role), { replace: true });
     } catch (err) {
       setError('Invalid email or password');
     }
@@ -31,153 +34,87 @@ export default function Login() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e0e7ff 40%, #f3e8ff 100%)',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* Decorative orbs */}
-      <div style={{
-        position: 'absolute',
-        width: 600,
-        height: 600,
-        background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)',
-        borderRadius: '50%',
-        top: '-200px',
-        right: '-150px',
-      }} />
-      <div style={{
-        position: 'absolute',
-        width: 400,
-        height: 400,
-        background: 'radial-gradient(circle, rgba(168,85,247,0.06) 0%, transparent 70%)',
-        borderRadius: '50%',
-        bottom: '-100px',
-        left: '-100px',
-      }} />
+    <div className="login-shell">
+      {/* Drifting orbs */}
+      <motion.span className="orb orb-1 orb-login-1" aria-hidden="true"
+        animate={{ x: [0, 30, -10, 0], y: [0, -20, 15, 0], scale: [1, 1.08, 0.96, 1] }}
+        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }} />
+      <motion.span className="orb orb-2 orb-login-2" aria-hidden="true"
+        animate={{ x: [0, -25, 12, 0], y: [0, 18, -12, 0], scale: [1, 0.94, 1.06, 1] }}
+        transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }} />
+      <motion.span className="orb orb-3 orb-login-3" aria-hidden="true"
+        animate={{ x: [0, 18, -18, 0], y: [0, -14, 10, 0] }}
+        transition={{ duration: 26, repeat: Infinity, ease: 'easeInOut' }} />
 
-      <div className="animate-scale" style={{
-        width: '100%',
-        maxWidth: 440,
-        padding: '0 20px',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        <div className="glass" style={{ padding: '44px 36px', textAlign: 'center' }}>
-          {/* Logo mark */}
-          <div style={{
-            width: 56,
-            height: 56,
-            background: 'var(--accent-gradient)',
-            borderRadius: 16,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 28px',
-            boxShadow: '0 8px 28px rgba(99,102,241,0.25)'
-          }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
-              <path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5"/>
+      <motion.div className="login-card-wrap"
+        initial={{ opacity: 0, scale: 0.94, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: EASE }}>
+        <div className="glass login-card">
+          {/* Logo mark with glow pulse */}
+          <motion.div className="login-logo"
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ ...SPRING, delay: 0.1 }}>
+            <motion.span className="login-logo-glow"
+              animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.15, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }} />
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white"
+              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+              <path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5" />
             </svg>
-          </div>
-          
-          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
-            SchoolAI Portal
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 36, fontSize: 14, fontWeight: 500 }}>
-            Authorized personnel only
-          </p>
+          </motion.div>
+
+          <motion.h1 className="login-title" {...field(0.18)}>SchoolAI Portal</motion.h1>
+          <motion.p className="login-sub" {...field(0.24)}>Authorized personnel only</motion.p>
 
           {error && (
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.06)',
-              border: '1px solid rgba(239, 68, 68, 0.18)',
-              color: '#b91c1c',
-              padding: '12px 16px',
-              borderRadius: 'var(--radius-xs)',
-              marginBottom: 20,
-              fontSize: 13,
-              fontWeight: 600,
-              animation: 'fadeIn 0.3s ease'
-            }}>
+            <motion.div className="login-error"
+              initial={{ opacity: 0, y: -8, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              transition={{ duration: 0.3, ease: EASE }}>
               {error}
-            </div>
+            </motion.div>
           )}
 
           <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 16 }}>
-              <input
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input"
-                required
-              />
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input"
-                required
-              />
-            </div>
+            <motion.div className="login-field" {...field(0.32)}>
+              <input type="email" placeholder="Email address" value={email}
+                onChange={(e) => setEmail(e.target.value)} className="input" required />
+            </motion.div>
+            <motion.div className="login-field" {...field(0.40)}>
+              <input type="password" placeholder="Password" value={password}
+                onChange={(e) => setPassword(e.target.value)} className="input" required />
+            </motion.div>
 
-            {/* Terms checkbox */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 10,
-              marginBottom: 24,
-              textAlign: 'left'
-            }}>
-              <input
-                type="checkbox"
-                id="terms"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                style={{
-                  width: 18,
-                  height: 18,
-                  marginTop: 2,
-                  accentColor: 'var(--accent)',
-                  cursor: 'pointer'
-                }}
-              />
-              <label htmlFor="terms" style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, cursor: 'pointer' }}>
-                I agree to the <a href="#" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Terms of Service</a> and <a href="#" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Privacy Policy</a>. I understand this system contains confidential student data.
+            <motion.div className="login-terms" {...field(0.48)}>
+              <input type="checkbox" id="terms" checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)} />
+              <label htmlFor="terms">
+                I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+                I understand this system contains confidential student data.
               </label>
-            </div>
+            </motion.div>
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-              style={{ width: '100%', padding: 14, fontSize: 15 }}
-            >
-              {loading ? 'Authenticating...' : 'Sign In'}
-            </button>
+            <motion.button type="submit" className="btn btn-primary login-submit"
+              disabled={loading} {...field(0.56)}
+              whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+              {loading ? (
+                <>
+                  <motion.span className="spin-icon" animate={{ rotate: 360 }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}>⟳</motion.span>
+                  Authenticating...
+                </>
+              ) : 'Sign In'}
+            </motion.button>
           </form>
         </div>
-        
-        <p style={{
-          textAlign: 'center',
-          marginTop: 28,
-          color: 'var(--text-muted)',
-          fontSize: 12,
-          fontWeight: 500
-        }}>
-          SchoolAI Data Intelligence Platform &middot; v1.0
-        </p>
-      </div>
+
+        <motion.p className="login-footer" {...field(0.7)}>
+          SchoolAI Data Intelligence Platform · v1.1
+        </motion.p>
+      </motion.div>
     </div>
   );
 }

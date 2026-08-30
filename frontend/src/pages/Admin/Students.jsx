@@ -1,69 +1,105 @@
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import api from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
+import { Page, staggerContainer, staggerItem } from '../../lib/motion.jsx';
+import { Toast } from '../../components/ui.jsx';
 
 export default function AdminStudents() {
+  const { user } = useAuth();
+  const [classes, setClasses] = useState([]);
+  const [classId, setClassId] = useState('');
+  const [classLabel, setClassLabel] = useState('');
   const [students, setStudents] = useState([]);
   const [name, setName] = useState('');
   const [rollNo, setRollNo] = useState('');
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+  const showToast = (m, t = 'success') => { setToast({ message: m, type: t }); setTimeout(() => setToast(null), 2600); };
 
   useEffect(() => {
-    fetchStudents();
+    api.get('/admin/classes').then(r => {
+      setClasses(r.data);
+      if (r.data.length) {
+        const first = r.data.find(c => c.id === user?.assigned_class_id) || r.data[0];
+        setClassId(String(first.id));
+      }
+    }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
-  const fetchStudents = async () => {
-    try {
-      const res = await api.get('/academics/class/1/report');
-      setStudents(res.data);
-    } catch (err) { console.error(err); }
-    setLoading(false);
+  useEffect(() => {
+    const c = classes.find(c => String(c.id) === classId);
+    setClassLabel(c ? c.label : '');
+    if (classId) loadStudents();
+  }, [classId, classes]);
+
+  const loadStudents = async () => {
+    try { const r = await api.get(`/admin/students/class/${classId}`); setStudents(r.data); } catch {}
   };
 
   const addStudent = async (e) => {
     e.preventDefault();
+    if (!name.trim() || !classId) return;
     try {
-      await api.post('/admin/students', { name, roll_no: rollNo, class_id: 1 });
-      setName(''); setRollNo('');
-      fetchStudents();
-    } catch (err) { alert('Error adding student'); }
+      await api.post('/admin/students', { name, roll_no: rollNo, class_id: parseInt(classId) });
+      setName(''); setRollNo(''); showToast('Student added'); loadStudents();
+    } catch { showToast('Error adding student', 'error'); }
   };
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Loading...</div>;
+  if (loading) return <Page><div className="glass" style={{ padding: 60, textAlign: 'center' }}>Loading…</div></Page>;
 
   return (
-    <div className="animate-fade">
+    <Page>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="page-header">
         <h2>Students</h2>
-        <p>Manage students in Class 6A</p>
+        <p>Manage students {classLabel ? `in ${classLabel}` : ''}</p>
       </div>
 
       <div className="glass" style={{ padding: 24, marginBottom: 24 }}>
-        <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 700 }}>Add Student</h3>
-        <form onSubmit={addStudent} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <input type="text" placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className="input" style={{ flex: 1, minWidth: 200 }} required />
-          <input type="text" placeholder="Roll No" value={rollNo} onChange={e => setRollNo(e.target.value)} className="input" style={{ width: 120 }} />
-          <button type="submit" className="btn btn-primary">Add</button>
+        <h3 className="section-title">Add Student</h3>
+        <form onSubmit={addStudent} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label className="form-field-block">
+            <span className="field-label">Class</span>
+            <select className="input" value={classId} onChange={e => setClassId(e.target.value)}>
+              {classes.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </label>
+          <label className="form-field-block" style={{ flex: 1, minWidth: 220 }}>
+            <span className="field-label">Full name</span>
+            <input type="text" placeholder="Student name" value={name} onChange={e => setName(e.target.value)} className="input" required />
+          </label>
+          <label className="form-field-block" style={{ width: 140 }}>
+            <span className="field-label">Roll No</span>
+            <input type="text" value={rollNo} onChange={e => setRollNo(e.target.value)} className="input" />
+          </label>
+          <button type="submit" className="btn btn-primary">+ Add Student</button>
         </form>
       </div>
 
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>#</th><th>Name</th><th style={{ textAlign: 'center' }}>Avg Score</th></tr>
+            <tr>
+              <th style={{ width: 60 }}>#</th>
+              <th>Name</th>
+              <th style={{ width: 140 }}>Roll No</th>
+            </tr>
           </thead>
           <tbody>
             {students.map((s, i) => (
-              <tr key={s.student_id}>
-                <td style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{i + 1}</td>
+              <motion.tr key={s.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.025, 0.5) }}>
+                <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>{i + 1}</td>
                 <td style={{ fontWeight: 600 }}>{s.name}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: s.average_score >= 60 ? '#10b981' : '#ef4444' }}>
-                  {s.average_score}
-                </td>
-              </tr>
+                <td style={{ textAlign: 'center' }}>{s.roll_no || '—'}</td>
+              </motion.tr>
             ))}
+            {!students.length && (
+              <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No students in this class yet.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
-    </div>
+    </Page>
   );
 }

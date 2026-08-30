@@ -4,34 +4,172 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.mark import Mark
 from app.models.student import Student
-from app.dependencies import get_current_user
+from app.models.class_ import Class
+from app.models.subject import Subject
+from app.models.grade_subject import GradeSubject
+from app.models.exam import Exam
+from app.schemas.admin import BulkMarksCreate
+from app.dependencies import get_current_user, require_role
 
 router = APIRouter(prefix="/academics", tags=["academics"])
+_allowed = require_role("class_teacher", "super_admin", "school_admin",
+                        "principal", "chairperson", "parent")
 
-@router.post("/marks")
-def add_mark(student_id: int, exam_name: str, score: float, max_score: float = 100, term: str = "", db: Session = Depends(get_db), user=Depends(get_current_user)):
-    mark = Mark(student_id=student_id, exam_name=exam_name, score=score, max_score=max_score, term=term)
-    db.add(mark)
+
+# ── Subjects (global list) ───────────────────────────────────
+@router.get("/subjects")
+def list_subjects(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return [{"id": s.id, "name": s.name, "color": s.color}
+            for s in db.query(Subject).order_by(Subject.id).all()]
+
+
+# ── Grade subjects (subjects configured for a grade in a school) ─
+@router.get("/grade/{school_id}/{grade}/subjects")
+def grade_subjects(school_id: int, grade: int, db: Session = Depends(get_db),
+                   user=Depends(get_current_user)):
+    rows = db.query(GradeSubject).filter(
+        GradeSubject.school_id == school_id, GradeSubject.grade == grade
+    ).all()
+    out = []
+    for gs in rows:
+        sub = db.query(Subject).filter(Subject.id == gs.subject_id).first()
+        if sub:
+            out.append({"id": sub.id, "name": sub.name, "color": sub.color})
+    return out
+
+
+# ── Exams for a class's grade ─────────────────────────────────
+@router.get("/class/{class_id}/exams")
+def class_exams(class_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    cls = db.query(Class).filter(Class.id == class_id).first()
+    if not cls:
+        raise HTTPException(status_code=404, detail="Class not found")
+    rows = db.query(Exam).filter(
+        Exam.school_id == cls.school_id, Exam.grade == cls.grade
+    ).order_by(Exam.id).all()
+    return [{"id": e.id, "name": e.name, "max_score": e.max_score, "term": e.term,
+             "grade": e.grade, "school_id": e.school_id} for e in rows]
+
+
+# ── Marks for a class + exam ──────────────────────────────────
+@router.get("/class/{class_id}/marks")
+def class_marks(class_id: int, exam_id: int, db: Session = Depends(get_db),
+               user=Depends(get_current_user)):
+    cls = db.query(Class).filter(Class.id == class_id).first()
+    if not cls:
+        raise HTTPException(status_code=404, detail="Class not found")
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    # subjects for this grade
+    gs_rows = db.query(GradeSubject).filter(
+        GradeSubject.school_id == cls.school_id, GradeSubject.grade == cls.grade
+    ).all()
+    subjects = []
+    for gs in gs_rows:
+        sub = db.query(Subject).filter(Subject.id == gs.subject_id).first()
+        if sub:
+            subjects.append(sub)
+
+    students = db.query(Student).filter(Student.class_id == class_id).order_by(Student.roll_no).all()
+    marks = db.query(Mark).filter(Mark.exam_id == exam_id).all()
+    mark_map = {(m.student_id, m.subject_id): m.score for m in marks}
+
+    return {
+        "exam_id": exam.id,
+        "exam_name": exam.name,
+        "max_score": exam.max_score,
+        "term": exam.term,
+        "subjects": [{"id": s.id, "name": s.name, "color": s.color} for s in subjects],
+        "students": [
+            {"id": s.id, "name": s.name,
+             "marks": {str(sub.id): mark_map.get((s.id, sub.id)) for sub in subjects}}
+            for s in students
+        ],
+    }
+
+
+# ── Bulk save marks (class teacher enters scores) ────────────
+@router.post("/marks/bulk")
+def save_bulk_marks(data: BulkMarksCreate, db: Session = Depends(get_db), user=Depends(_allowed)):
+    cls = db.query(Class).filter(Class.id == data.class_id).first()
+    if not cls:
+        raise HTTPException(status_code=404, detail="Class not found")
+    exam = db.query(Exam).filter(Exam.id == data.exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    for item in data.marks:
+        if item.score < 0 or item.score > exam.max_score:
+            raise HTTPException(status_code=400,
+                                detail=f"Score {item.score} out of range for exam max {exam.max_score}")
+        existing = db.query(Mark).filter(
+            Mark.student_id == item.student_id,
+            Mark.subject_id == item.subject_id,
+            Mark.exam_id == data.exam_id,
+        ).first()
+        if existing:
+            existing.score = item.score
+        else:
+            db.add(Mark(student_id=item.student_id, subject_id=item.subject_id,
+                        exam_id=data.exam_id, score=item.score))
     db.commit()
-    db.refresh(mark)
-    return {"id": mark.id, "student_id": mark.student_id, "score": mark.score}
+    return {"status": "saved", "count": len(data.marks)}
 
+
+# ── Single student marks (parent view + class report) ───────
 @router.get("/student/{student_id}")
-def get_student_marks(student_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def student_marks(student_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
     marks = db.query(Mark).filter(Mark.student_id == student_id).all()
-    return [{"exam": m.exam_name, "score": m.score, "max": m.max_score, "term": m.term} for m in marks]
+    out = []
+    for m in marks:
+        sub = db.query(Subject).filter(Subject.id == m.subject_id).first()
+        exam = db.query(Exam).filter(Exam.id == m.exam_id).first()
+        max_score = exam.max_score if exam else 100
+        pct = round((m.score / max_score) * 100, 1) if max_score else 0
+        out.append({
+            "exam": exam.name if exam else "Unknown",
+            "subject": sub.name if sub else "General",
+            "subject_color": sub.color if sub else "#64748b",
+            "score": m.score, "max": max_score, "percentage": pct,
+            "term": exam.term if exam else None,
+        })
+    return out
 
+
+# ── Class report (averages + grade per student) ──────────────
 @router.get("/class/{class_id}/report")
-def get_class_report(class_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def class_report(class_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    cls = db.query(Class).filter(Class.id == class_id).first()
+    if not cls:
+        raise HTTPException(status_code=404, detail="Class not found")
     students = db.query(Student).filter(Student.class_id == class_id).all()
+
+    # figure out max_score baseline (use the first exam's max, or 100)
+    exams = db.query(Exam).filter(
+        Exam.school_id == cls.school_id, Exam.grade == cls.grade
+    ).all()
+    baseline_max = exams[0].max_score if exams else 100
+
     result = []
     for s in students:
         marks = db.query(Mark).filter(Mark.student_id == s.id).all()
-        avg = sum(m.score for m in marks) / len(marks) if marks else 0
+        if marks:
+            # average as percentage of each exam's max, then overall
+            pcts = []
+            for m in marks:
+                ex = next((e for e in exams if e.id == m.exam_id), None)
+                mx = ex.max_score if ex else baseline_max
+                pcts.append((m.score / mx) * 100 if mx else 0)
+            avg_pct = round(sum(pcts) / len(pcts), 1)
+        else:
+            avg_pct = 0
         result.append({
-            "student_id": s.id,
-            "name": s.name,
-            "average_score": round(avg, 2),
-            "exams": len(marks)
+            "student_id": s.id, "name": s.name,
+            "average_score": avg_pct, "exams": len(set(m.exam_id for m in marks)),
         })
     return result
