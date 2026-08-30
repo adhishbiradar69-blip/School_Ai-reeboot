@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: schoolai-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: ALLOWED_ORIGINS
+        sync: false  # set this manually after creating the Vercel frontend
+      - key: GROQ_API_KEY
+        sync: false  # optional: set if you have a Groq key
+    healthCheckPath: /
+    autoDeploy: true

@@ -29,7 +29,12 @@ export default function Login() {
       const user = await login(email, password);
       navigate(homePathFor(user.role), { replace: true });
     } catch (err) {
-      setError('Invalid email or password');
+      if (!err.response) {
+        // Network error — backend unreachable
+        setError('Cannot reach the server. If this is a deployed site, the backend needs to be deployed separately. See the README for instructions.');
+      } else {
+        setError('Invalid email or password');
+      }
     }
     setLoading(false);
   };

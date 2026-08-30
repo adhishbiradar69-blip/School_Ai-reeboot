@@ -60,11 +60,57 @@ If unset, falls back to the built-in z-ai LLM.
 
 ## Deployment
 
-### Frontend (Vercel)
-The `vercel.json` is preconfigured. Connect the repo to Vercel and deploy — it builds the frontend automatically.
+**Important**: This is a full-stack app. The frontend deploys to Vercel, but the backend (FastAPI) must be deployed separately — Vercel only hosts static files.
 
-### Backend
-Deploy the FastAPI backend to Render, Railway, or any Python host. Set `GROQ_API_KEY` as an env var. Point the frontend's API URL via `VITE_API_URL` env var in Vercel.
+### Step 1 — Deploy the backend (Render / Railway / Fly.io)
+
+1. Push the `backend/` folder to a new Git repo (or use a subfolder)
+2. Create a new Web Service on [Render](https://render.com) (free tier works):
+   - **Build command**: `pip install -r requirements.txt`
+   - **Start command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Environment**: Python 3
+3. Add environment variables on Render:
+   - `GROQ_API_KEY` — your Groq API key (optional, falls back to z-ai if unset)
+   - `ALLOWED_ORIGINS` — `https://your-app.vercel.app,http://localhost:5173` (your Vercel URL + localhost for dev)
+4. You'll get a backend URL like `https://schoolai-api.onrender.com`
+5. Test it: visit `https://schoolai-api.onrender.com/` — should return `{"status":"running"}`
+
+### Step 2 — Deploy the frontend (Vercel)
+
+1. Push the repo to GitHub
+2. On [Vercel](https://vercel.com), import the repo
+3. **Root Directory**: leave as-is (the repo root, NOT `frontend/`)
+4. Vercel auto-detects `vercel.json` which handles the build
+5. **Add an environment variable** in Vercel:
+   - Name: `VITE_API_URL`
+   - Value: `https://schoolai-api.onrender.com` (your Render URL from Step 1)
+6. Deploy
+
+### Step 3 — Bootstrap the production database
+
+After both are deployed, create the admin + seed data:
+```bash
+# Register super_admin
+curl -X POST https://YOUR-BACKEND-URL.onrender.com/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@schoolai.test","password":"admin123","role":"super_admin","full_name":"Super Admin"}'
+
+# Login → get token
+curl -X POST https://YOUR-BACKEND-URL.onrender.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@schoolai.test","password":"admin123"}'
+
+# Seed full demo data
+curl -X POST https://YOUR-BACKEND-URL.onrender.com/admin/seed-full \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+Then log in at your Vercel URL with `admin@schoolai.test` / `admin123`.
+
+### Troubleshooting
+- **Login fails on Vercel**: You forgot to set `VITE_API_URL`. The login page will show "Cannot reach the server" if the backend URL is wrong/unset.
+- **CORS errors in console**: Add your Vercel URL to the `ALLOWED_ORIGINS` env var on Render.
+- **Backend sleeps on free tier**: Render's free tier sleeps after 15 min of inactivity. First request after sleep takes ~30s. Upgrade to paid tier for production use.
 
 ## License
 MIT
