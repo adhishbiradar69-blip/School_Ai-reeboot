@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Loader2, AlertCircle, GraduationCap } from 'lucide-react';
 import { useAuth, homePathFor } from '../auth/AuthContext';
 import { EASE, SPRING } from '../lib/motion.jsx';
 
@@ -59,11 +60,7 @@ export default function Login() {
             <motion.span className="login-logo-glow"
               animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.15, 1] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }} />
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white"
-              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-              <path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5" />
-            </svg>
+            <GraduationCap size={28} strokeWidth={2.4} color="#fff" />
           </motion.div>
 
           <motion.h1 className="login-title" {...field(0.18)}>SchoolAI Portal</motion.h1>
@@ -74,7 +71,8 @@ export default function Login() {
               initial={{ opacity: 0, y: -8, height: 0 }}
               animate={{ opacity: 1, y: 0, height: 'auto' }}
               transition={{ duration: 0.3, ease: EASE }}>
-              {error}
+              <AlertCircle size={16} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+              <span>{error}</span>
             </motion.div>
           )}
 
@@ -92,7 +90,7 @@ export default function Login() {
               <input type="checkbox" id="terms" checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)} />
               <label htmlFor="terms">
-                I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+                I agree to the <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>.
                 I understand this system contains confidential student data.
               </label>
             </motion.div>
@@ -103,7 +101,10 @@ export default function Login() {
               {loading ? (
                 <>
                   <motion.span className="spin-icon" animate={{ rotate: 360 }}
-                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}>⟳</motion.span>
+                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                    style={{ display: 'inline-flex' }}>
+                    <Loader2 size={16} />
+                  </motion.span>
                   Authenticating...
                 </>
               ) : 'Sign In'}
@@ -112,7 +113,8 @@ export default function Login() {
         </div>
 
         <motion.p className="login-footer" {...field(0.7)}>
-          SchoolAI Data Intelligence Platform · v1.1
+          <Link to="/" className="login-footer-back">← Back to site</Link>
+          <span>SchoolAI Data Intelligence Platform · v1.1</span>
         </motion.p>
       </motion.div>
     </div>

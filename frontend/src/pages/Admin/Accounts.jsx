@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { UserCheck, Briefcase, Target, Users, User, Trash2, Check, Plus } from 'lucide-react';
 import api from '../../api/client';
 import { Page, EASE, staggerContainer, staggerItem } from '../../lib/motion.jsx';
 import { CountUp, Toast } from '../../components/ui.jsx';
 
 const ROLES = [
-  { id: 'class_teacher', label: 'Class Teacher', icon: '🧑‍🏫', desc: 'Teaches & marks one class' },
-  { id: 'principal', label: 'Principal', icon: '👔', desc: 'Manages one school' },
-  { id: 'chairperson', label: 'Chairperson', icon: '🎯', desc: 'Oversees multiple schools' },
-  { id: 'parent', label: 'Parent', icon: '👨‍👩‍👧', desc: 'Views their child\'s progress' },
+  { id: 'class_teacher', label: 'Class Teacher', Icon: UserCheck, desc: 'Teaches & marks one class' },
+  { id: 'principal', label: 'Principal', Icon: Briefcase, desc: 'Manages one school' },
+  { id: 'chairperson', label: 'Chairperson', Icon: Target, desc: 'Oversees multiple schools' },
+  { id: 'parent', label: 'Parent', Icon: Users, desc: 'Views their child\'s progress' },
 ];
 
 export default function AccountCreation() {
@@ -96,15 +97,18 @@ export default function AccountCreation() {
           {/* Role picker */}
           <h3 className="section-title" style={{ marginBottom: 16 }}>Role</h3>
           <div className="role-picker">
-            {ROLES.map(r => (
-              <motion.button key={r.id} type="button" className={`role-card ${role === r.id ? 'active' : ''}`}
-                whileHover={{ y: -3 }} whileTap={{ scale: 0.97 }}
-                onClick={() => setRole(r.id)}>
-                <span className="role-icon">{r.icon}</span>
-                <span className="role-name">{r.label}</span>
-                <span className="role-desc">{r.desc}</span>
-              </motion.button>
-            ))}
+            {ROLES.map(r => {
+              const RoleIcon = r.Icon;
+              return (
+                <motion.button key={r.id} type="button" className={`role-card ${role === r.id ? 'active' : ''}`}
+                  whileHover={{ y: -3 }} whileTap={{ scale: 0.97 }}
+                  onClick={() => setRole(r.id)}>
+                  <span className="role-icon"><RoleIcon size={22} /></span>
+                  <span className="role-name">{r.label}</span>
+                  <span className="role-desc">{r.desc}</span>
+                </motion.button>
+              );
+            })}
           </div>
 
           <form onSubmit={submit} style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -151,7 +155,7 @@ export default function AccountCreation() {
                           <motion.button key={s.id} type="button" className={`chip ${on ? 'chip-on' : ''}`}
                             whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                             onClick={() => toggleSchool(s.id)}>
-                            {on ? '✓ ' : ''}{s.name}
+                            {on && <Check size={14} style={{ display: 'inline-block', verticalAlign: '-2px' }} />} {s.name}
                           </motion.button>
                         );
                       })}
@@ -179,7 +183,7 @@ export default function AccountCreation() {
             </AnimatePresence>
 
             <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', padding: '12px 32px' }}>
-              + Create {ROLES.find(r => r.id === role).label} Account
+              <Plus size={16} style={{ display: 'inline-block', verticalAlign: '-2px' }} /> Create {ROLES.find(r => r.id === role).label} Account
             </button>
           </form>
         </div>
@@ -189,26 +193,30 @@ export default function AccountCreation() {
           <h3 className="section-title">Accounts ({accounts.length})</h3>
           <motion.div variants={staggerContainer} initial="initial" animate="animate">
             <AnimatePresence>
-              {accounts.map(a => (
-                <motion.div key={a.id} className="account-row" variants={staggerItem}
-                  exit={{ opacity: 0, x: 20 }}>
-                  <div className="account-info">
-                    <span className="account-avatar">
-                      {ROLES.find(r => r.id === a.role)?.icon || '👤'}
-                    </span>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{a.full_name || a.email}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.email}</div>
+              {accounts.map(a => {
+                const r = ROLES.find(x => x.id === a.role);
+                const AccIcon = r?.Icon || User;
+                return (
+                  <motion.div key={a.id} className="account-row" variants={staggerItem}
+                    exit={{ opacity: 0, x: 20 }}>
+                    <div className="account-info">
+                      <span className="account-avatar">
+                        <AccIcon size={18} />
+                      </span>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{a.full_name || a.email}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.email}</div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="account-meta">
-                    <span className="pill" style={{ background: '#ede9fe', color: '#6d28d9', fontSize: 10, textTransform: 'capitalize' }}>
-                      {a.role.replace('_', ' ')}
-                    </span>
-                    <button className="icon-del" onClick={() => del(a.id)} title="Delete">🗑</button>
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="account-meta">
+                      <span className="pill" style={{ background: '#ede9fe', color: '#6d28d9', fontSize: 10, textTransform: 'capitalize' }}>
+                        {a.role.replace('_', ' ')}
+                      </span>
+                      <button className="icon-del" onClick={() => del(a.id)} title="Delete"><Trash2 size={16} /></button>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
             {!accounts.length && <div className="empty-mini">No accounts yet.</div>}
           </motion.div>
@@ -218,9 +226,12 @@ export default function AccountCreation() {
       <div className="stat-grid" style={{ marginTop: 24, gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' }}>
         {ROLES.map(r => {
           const count = accounts.filter(a => a.role === r.id).length;
+          const RoleIcon = r.Icon;
           return (
             <motion.div key={r.id} className="stat-card" whileHover={{ y: -4 }}>
-              <div className="stat-icon" style={{ background: '#f0eeea', fontSize: 22 }}>{r.icon}</div>
+              <div className="stat-icon" style={{ background: '#f0eeea' }}>
+                <RoleIcon size={22} color="var(--accent)" />
+              </div>
               <div style={{ fontSize: 30, fontWeight: 800 }}><CountUp value={count} /></div>
               <div className="stat-label">{r.label}s</div>
             </motion.div>

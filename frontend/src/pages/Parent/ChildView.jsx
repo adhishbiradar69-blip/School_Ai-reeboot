@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { SearchX, Library, BarChart3, Check, Calendar } from 'lucide-react';
 import api from '../../api/client';
 import { Page, staggerContainer, staggerItem } from '../../lib/motion.jsx';
 import { CountUp } from '../../components/ui.jsx';
@@ -16,7 +17,7 @@ export default function ParentChildView() {
   if (!data) return (
     <Page>
       <div className="glass" style={{ padding: 60, textAlign: 'center' }}>
-        <p style={{ fontSize: 48, marginBottom: 16 }}>🔍</p>
+        <SearchX size={48} color="var(--text-muted)" style={{ marginBottom: 16 }} />
         <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No Child Linked</h3>
         <p style={{ color: 'var(--text-secondary)' }}>Contact the administrator to link your child to this account.</p>
       </div>
@@ -36,19 +37,24 @@ export default function ParentChildView() {
 
       <motion.div variants={staggerContainer} initial="initial" animate="animate" className="stat-grid">
         {[
-          { v: data.marks.length, l: 'Subject Scores', c: '#6366f1', i: '📚', bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
-          { v: avg, l: 'Average %', c: '#10b981', i: '📊', bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)' },
-          { v: data.attendance.rate, l: 'Attendance %', c: '#f59e0b', i: '✓', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)' },
-          { v: data.attendance.present, l: 'Days Present', c: '#8b5cf6', i: '🗓', bg: 'linear-gradient(135deg,#ede9fe,#ddd6fe)' },
-        ].map((s, i) => (
-          <motion.div key={i} variants={staggerItem} className="stat-card" whileHover={{ y: -5 }}>
-            <div className="stat-icon" style={{ background: s.bg, fontSize: 22 }}>{s.i}</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: s.c, letterSpacing: '-1px' }}>
-              <CountUp value={s.v} decimals={s.v % 1 ? 1 : 0} />
-            </div>
-            <div className="stat-label">{s.l}</div>
-          </motion.div>
-        ))}
+          { v: data.marks.length, l: 'Subject Scores', c: '#6366f1', Icon: Library, bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
+          { v: avg, l: 'Average %', c: '#10b981', Icon: BarChart3, bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)' },
+          { v: data.attendance.rate, l: 'Attendance %', c: '#f59e0b', Icon: Check, bg: 'linear-gradient(135deg,#fef3c7,#fde68a)' },
+          { v: data.attendance.present, l: 'Days Present', c: '#8b5cf6', Icon: Calendar, bg: 'linear-gradient(135deg,#ede9fe,#ddd6fe)' },
+        ].map((s, i) => {
+          const SIcon = s.Icon;
+          return (
+            <motion.div key={i} variants={staggerItem} className="stat-card" whileHover={{ y: -5 }}>
+              <div className="stat-icon" style={{ background: s.bg, color: s.c }}>
+                <SIcon size={22} strokeWidth={2.2} />
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 800, color: s.c, letterSpacing: '-1px' }}>
+                <CountUp value={s.v} decimals={s.v % 1 ? 1 : 0} />
+              </div>
+              <div className="stat-label">{s.l}</div>
+            </motion.div>
+          );
+        })}
       </motion.div>
 
       <div className="glass" style={{ padding: 28, marginTop: 8 }}>

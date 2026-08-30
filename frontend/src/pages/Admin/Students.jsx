@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Plus } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { Page, staggerContainer, staggerItem } from '../../lib/motion.jsx';
@@ -73,7 +74,7 @@ export default function AdminStudents() {
             <span className="field-label">Roll No</span>
             <input type="text" value={rollNo} onChange={e => setRollNo(e.target.value)} className="input" />
           </label>
-          <button type="submit" className="btn btn-primary">+ Add Student</button>
+          <button type="submit" className="btn btn-primary"><Plus size={16} style={{ display: 'inline-block', verticalAlign: '-2px' }} /> Add Student</button>
         </form>
       </div>
 

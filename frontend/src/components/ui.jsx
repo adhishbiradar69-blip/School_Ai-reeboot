@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle2, XCircle, Info, X } from 'lucide-react';
 import { EASE, SPRING } from '../lib/motion.jsx';
 
 /* Animated number that counts from previous value to next, with easing. */
@@ -41,10 +42,10 @@ export function Toast({ message, type = 'success', onClose, duration = 2600 }) {
   }, [onClose, duration]);
 
   const colors = {
-    success: { bg: 'linear-gradient(135deg,#d4f5e9,#a8e6d3)', color: '#0d7a5e', icon: '✓' },
-    error: { bg: 'linear-gradient(135deg,#fce4e8,#f9c4cc)', color: '#b0304a', icon: '✕' },
-    info: { bg: 'linear-gradient(135deg,#dbeafe,#bfdbfe)', color: '#1e40af', icon: 'ℹ' },
-  }[type] || { bg: '#f0eeea', color: '#5a5a5a', icon: '•' };
+    success: { bg: 'linear-gradient(135deg,#d4f5e9,#a8e6d3)', color: '#0d7a5e', Icon: CheckCircle2 },
+    error: { bg: 'linear-gradient(135deg,#fce4e8,#f9c4cc)', color: '#b0304a', Icon: XCircle },
+    info: { bg: 'linear-gradient(135deg,#dbeafe,#bfdbfe)', color: '#1e40af', Icon: Info },
+  }[type] || { bg: '#f0eeea', color: '#5a5a5a', Icon: Info };
 
   return (
     <div className="toast-host">
@@ -60,7 +61,7 @@ export function Toast({ message, type = 'success', onClose, duration = 2600 }) {
         onDragEnd={(e, info) => { if (info.offset.y < -30) onClose(); }}
         style={{ background: colors.bg, color: colors.color }}
       >
-        <span className="toast-icon">{colors.icon}</span>
+        <span className="toast-icon"><colors.Icon size={18} strokeWidth={2.5} /></span>
         <span>{message}</span>
         <div className="toast-bar">
           <motion.div
@@ -111,7 +112,7 @@ export function Modal({ open, onClose, children, title, wide }) {
             {title && (
               <div className="modal-header">
                 <h3>{title}</h3>
-                <button onClick={onClose} className="modal-close">✕</button>
+                <button onClick={onClose} className="modal-close" aria-label="Close"><X size={16} /></button>
               </div>
             )}
             <div className="modal-body">{children}</div>

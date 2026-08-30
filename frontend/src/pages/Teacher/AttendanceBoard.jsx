@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AlertTriangle, Check, X, Clock, Save, Loader2, Users } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { Page, EASE, SPRING, staggerContainer, staggerItem } from '../../lib/motion.jsx';
@@ -16,13 +17,14 @@ function SkeletonRow({ index }) {
 }
 
 const STATUS = {
-  P: { next: 'A', cls: 'pill-present', label: 'Present', icon: '✓', color: '#059669' },
-  A: { next: 'L', cls: 'pill-absent', label: 'Absent', icon: '✕', color: '#dc2626' },
-  L: { next: 'P', cls: 'pill-late', label: 'Late', icon: '⏱', color: '#d97706' },
+  P: { next: 'A', cls: 'pill-present', label: 'Present', Icon: Check, color: '#059669' },
+  A: { next: 'L', cls: 'pill-absent', label: 'Absent', Icon: X, color: '#dc2626' },
+  L: { next: 'P', cls: 'pill-late', label: 'Late', Icon: Clock, color: '#d97706' },
 };
 
 function StatusPill({ status, onClick, active }) {
   const s = STATUS[status] || STATUS.P;
+  const StatusIcon = s.Icon;
   return (
     <motion.button
       onClick={onClick}
@@ -34,7 +36,7 @@ function StatusPill({ status, onClick, active }) {
       style={{ '--pill-color': s.color }}
     >
       <motion.span animate={{ rotate: active ? [0, -8, 8, 0] : 0 }} transition={{ duration: 0.34 }}
-        style={{ display: 'inline-block' }}>{s.icon}</motion.span>
+        style={{ display: 'inline-flex', alignItems: 'center' }}><StatusIcon size={14} strokeWidth={3} /></motion.span>
       <span style={{ marginLeft: 4 }}>{s.label}</span>
     </motion.button>
   );
@@ -90,7 +92,7 @@ export default function AttendanceBoard() {
 
   if (!classId) return (
     <Page><div className="glass" style={{ textAlign: 'center', padding: 60, marginTop: 40 }}>
-      <p style={{ fontSize: 48, marginBottom: 16 }}>⚠️</p>
+      <AlertTriangle size={48} color="#d97706" style={{ marginBottom: 16 }} />
       <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No Class Assigned</h3>
       <p style={{ color: 'var(--text-secondary)' }}>Please contact the administrator to assign you a class.</p>
     </div></Page>
@@ -119,27 +121,32 @@ export default function AttendanceBoard() {
 
       <motion.div variants={staggerContainer} initial="initial" animate="animate" className="stat-grid">
         {[
-          { v: students.length, l: 'Total Students', c: '#1a1f36', i: '🏫', bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
-          { v: present.length, l: 'Present Today', c: '#059669', i: '✓', bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)', bar: present.length },
-          { v: absent.length, l: 'Absent Today', c: '#dc2626', i: '✕', bg: 'linear-gradient(135deg,#fee2e2,#fecaca)', bar: absent.length },
-          { v: late.length, l: 'Late Today', c: '#d97706', i: '⏱', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', bar: late.length },
-        ].map((s, i) => (
-          <motion.div key={i} variants={staggerItem} className="stat-card" whileHover={{ y: -5 }}>
-            <div className="stat-icon" style={{ background: s.bg, fontSize: 22 }}>{s.i}</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: s.c, letterSpacing: '-1px' }}>
-              <CountUp value={s.v} />
-            </div>
-            <div className="stat-label">{s.l}</div>
-            {s.bar !== undefined && (
-              <div className="attendance-bar-track" style={{ marginTop: 12 }}>
-                <motion.div className="attendance-bar-fill"
-                  initial={{ width: 0 }} animate={{ width: `${students.length ? (s.bar / students.length) * 100 : 0}%` }}
-                  transition={{ duration: 0.7, ease: EASE }}
-                  style={{ background: s.c === '#059669' ? 'linear-gradient(90deg,#34d399,#059669)' : s.c === '#dc2626' ? 'linear-gradient(90deg,#f87171,#dc2626)' : 'linear-gradient(90deg,#fbbf24,#d97706)' }} />
+          { v: students.length, l: 'Total Students', c: '#1a1f36', Icon: Users, bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
+          { v: present.length, l: 'Present Today', c: '#059669', Icon: Check, bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)', bar: present.length },
+          { v: absent.length, l: 'Absent Today', c: '#dc2626', Icon: X, bg: 'linear-gradient(135deg,#fee2e2,#fecaca)', bar: absent.length },
+          { v: late.length, l: 'Late Today', c: '#d97706', Icon: Clock, bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', bar: late.length },
+        ].map((s, i) => {
+          const SIcon = s.Icon;
+          return (
+            <motion.div key={i} variants={staggerItem} className="stat-card" whileHover={{ y: -5 }}>
+              <div className="stat-icon" style={{ background: s.bg, color: s.c }}>
+                <SIcon size={22} strokeWidth={2.2} />
               </div>
-            )}
-          </motion.div>
-        ))}
+              <div style={{ fontSize: 36, fontWeight: 800, color: s.c, letterSpacing: '-1px' }}>
+                <CountUp value={s.v} />
+              </div>
+              <div className="stat-label">{s.l}</div>
+              {s.bar !== undefined && (
+                <div className="attendance-bar-track" style={{ marginTop: 12 }}>
+                  <motion.div className="attendance-bar-fill"
+                    initial={{ width: 0 }} animate={{ width: `${students.length ? (s.bar / students.length) * 100 : 0}%` }}
+                    transition={{ duration: 0.7, ease: EASE }}
+                    style={{ background: s.c === '#059669' ? 'linear-gradient(90deg,#34d399,#059669)' : s.c === '#dc2626' ? 'linear-gradient(90deg,#f87171,#dc2626)' : 'linear-gradient(90deg,#fbbf24,#d97706)' }} />
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
       </motion.div>
 
       <AnimatePresence>
@@ -178,8 +185,8 @@ export default function AttendanceBoard() {
           <input type="date" value={date} onChange={e => setDate(e.target.value)} onKeyDown={e => e.preventDefault()} className="input" style={{ width: 'auto', minWidth: 150 }} />
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => markAll('P')} className="btn btn-secondary" style={{ fontSize: 13 }}>✓ All Present</button>
-          <button onClick={() => markAll('A')} className="btn btn-secondary" style={{ fontSize: 13 }}>✕ All Absent</button>
+          <button onClick={() => markAll('P')} className="btn btn-secondary" style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check size={14} /> All Present</button>
+          <button onClick={() => markAll('A')} className="btn btn-secondary" style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}><X size={14} /> All Absent</button>
         </div>
       </div>
 
@@ -205,7 +212,7 @@ export default function AttendanceBoard() {
       <div style={{ marginTop: 24 }}>
         <motion.button onClick={save} disabled={saving} className="btn btn-primary"
           whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{ padding: '12px 36px', fontSize: 15 }}>
-          {saving ? (<><motion.span className="spin-icon" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }} style={{ marginRight: 8 }}>⟳</motion.span>Saving...</>) : '💾 Save Attendance'}
+          {saving ? (<><motion.span className="spin-icon" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }} style={{ marginRight: 8, display: 'inline-flex' }}><Loader2 size={16} /></motion.span>Saving...</>) : <><Save size={16} style={{ marginRight: 6, display: 'inline-flex', verticalAlign: '-2px' }} /> Save Attendance</>}
         </motion.button>
       </div>
     </Page>

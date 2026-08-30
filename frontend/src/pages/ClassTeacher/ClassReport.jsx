@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { GraduationCap, BarChart3 } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { Page, staggerContainer, staggerItem } from '../../lib/motion.jsx';
@@ -38,12 +39,16 @@ export default function ClassReport() {
       <motion.div variants={staggerContainer} initial="initial" animate="animate"
         className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
         <motion.div variants={staggerItem} className="stat-card" whileHover={{ y: -5 }}>
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)', color: '#6366f1', fontSize: 22 }}>👨‍🎓</div>
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)', color: '#6366f1' }}>
+            <GraduationCap size={22} />
+          </div>
           <div style={{ fontSize: 32, fontWeight: 800 }}><CountUp value={report.length} /></div>
           <div className="stat-label">Total Students</div>
         </motion.div>
         <motion.div variants={staggerItem} className="stat-card" whileHover={{ y: -5 }}>
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg,#d1fae5,#a7f3d0)', fontSize: 22 }}>📊</div>
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg,#d1fae5,#a7f3d0)', color: '#10b981' }}>
+            <BarChart3 size={22} />
+          </div>
           <div style={{ fontSize: 32, fontWeight: 800, color: '#10b981' }}><CountUp value={avg} decimals={1} /></div>
           <div className="stat-label">Class Average %</div>
         </motion.div>

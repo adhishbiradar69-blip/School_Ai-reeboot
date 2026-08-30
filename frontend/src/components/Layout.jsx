@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ClipboardList, CheckSquare, PenLine, BarChart3, Building2, GraduationCap,
+  KeyRound, Briefcase, Target, Users, ChevronLeft, ChevronRight, LogOut,
+} from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { EASE, SPRING } from '../lib/motion.jsx';
+import ThemeSelector from './ThemeSelector.jsx';
 
 const A = ['super_admin', 'school_admin', 'admin'];
 const allNavGroups = [
@@ -10,40 +15,40 @@ const allNavGroups = [
     label: 'Class Teacher',
     roles: ['class_teacher', ...A],
     items: [
-      { path: '/teacher/attendance', label: 'Attendance', icon: '📋' },
-      { path: '/teacher/tasks', label: 'Tasks', icon: '✅' },
-      { path: '/teacher/marks', label: 'Marks', icon: '📝' },
-      { path: '/class-teacher/report', label: 'Class Report', icon: '📊' },
+      { path: '/teacher/attendance', label: 'Attendance', icon: ClipboardList },
+      { path: '/teacher/tasks', label: 'Tasks', icon: CheckSquare },
+      { path: '/teacher/marks', label: 'Marks', icon: PenLine },
+      { path: '/class-teacher/report', label: 'Class Report', icon: BarChart3 },
     ]
   },
   {
     label: 'Administration',
     roles: A,
     items: [
-      { path: '/admin/dashboard', label: 'Dashboard', icon: '🏫' },
-      { path: '/admin/students', label: 'Students', icon: '👨‍🎓' },
-      { path: '/admin/accounts', label: 'Accounts', icon: '🔑' },
+      { path: '/admin/dashboard', label: 'Dashboard', icon: Building2 },
+      { path: '/admin/students', label: 'Students', icon: GraduationCap },
+      { path: '/admin/accounts', label: 'Accounts', icon: KeyRound },
     ]
   },
   {
     label: 'Principal',
     roles: ['principal', ...A],
     items: [
-      { path: '/principal/dashboard', label: 'Dashboard', icon: '👔' },
+      { path: '/principal/dashboard', label: 'Dashboard', icon: Briefcase },
     ]
   },
   {
     label: 'Chairperson',
     roles: ['chairperson', ...A],
     items: [
-      { path: '/chairperson/dashboard', label: 'Multi-School', icon: '🎯' },
+      { path: '/chairperson/dashboard', label: 'Multi-School', icon: Target },
     ]
   },
   {
     label: 'Parents',
     roles: ['parent', ...A],
     items: [
-      { path: '/parent/view', label: 'My Child', icon: '👨‍👩‍👧' },
+      { path: '/parent/view', label: 'My Child', icon: Users },
     ]
   },
 ];
@@ -91,7 +96,7 @@ export default function Layout({ children }) {
           </div>
           <button className="sidebar-toggle" onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? 'Expand' : 'Collapse'}>
-            {collapsed ? '→' : '←'}
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
 
@@ -99,22 +104,25 @@ export default function Layout({ children }) {
           {visibleGroups.map((group) => (
             <div key={group.label} className="nav-group">
               {!collapsed && <div className="nav-group-label">{group.label}</div>}
-              {group.items.map((item) => (
-                <NavLink key={item.path} to={item.path}
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                  title={collapsed ? item.label : ''}>
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <motion.span layoutId="nav-active-pill" className="nav-active-pill"
-                          transition={SPRING} />
-                      )}
-                      <span className="nav-icon">{item.icon}</span>
-                      {!collapsed && <span className="nav-text">{item.label}</span>}
-                    </>
-                  )}
-                </NavLink>
-              ))}
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink key={item.path} to={item.path}
+                    className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                    title={collapsed ? item.label : ''}>
+                    {({ isActive }) => (
+                      <>
+                        {isActive && (
+                          <motion.span layoutId="nav-active-pill" className="nav-active-pill"
+                            transition={SPRING} />
+                        )}
+                        <span className="nav-icon"><Icon size={18} strokeWidth={2} /></span>
+                        {!collapsed && <span className="nav-text">{item.label}</span>}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
           ))}
         </nav>
@@ -125,7 +133,12 @@ export default function Layout({ children }) {
             <p className="footer-email">{user?.full_name || user?.email || 'User'}</p>
             <p className="footer-role">{roleLabel[userRole] || userRole}</p>
           </div>
-          <button onClick={handleLogout} className="btn btn-ghost">Sign Out</button>
+          <div className="footer-theme-wrap">
+            <ThemeSelector />
+          </div>
+          <button onClick={handleLogout} className="btn btn-ghost btn-sign-out">
+            <LogOut size={16} /> <span>Sign Out</span>
+          </button>
         </div>
       </motion.aside>
 

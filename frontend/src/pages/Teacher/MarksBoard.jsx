@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Users, FileText, BarChart3, Pencil, ClipboardList, Save, Loader2, AlertTriangle } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { Page, EASE, staggerContainer, staggerItem } from '../../lib/motion.jsx';
@@ -131,17 +132,22 @@ export default function MarksBoard() {
       </div>
 
       <motion.div variants={staggerContainer} initial="initial" animate="animate" className="stat-grid">
-        {[{ v: students.length, l: 'Total Students', c: '#4f7df3', i: '🏫', bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
-          { v: exams.length, l: 'Exams Configured', c: '#d97706', i: '📝', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)' },
-          { v: classAvg(), l: 'Class Average', c: '#059669', i: '📊', bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)' }].map((s, i) => (
-          <motion.div key={i} variants={staggerItem} className="stat-card" whileHover={{ y: -5 }}>
-            <div className="stat-icon" style={{ background: s.bg, fontSize: 22 }}>{s.i}</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: s.c, letterSpacing: '-1px' }}>
-              <CountUp value={s.v} decimals={s.v % 1 ? 1 : 0} />
-            </div>
-            <div className="stat-label">{s.l}</div>
-          </motion.div>
-        ))}
+        {[{ v: students.length, l: 'Total Students', c: '#4f7df3', Icon: Users, bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
+          { v: exams.length, l: 'Exams Configured', c: '#d97706', Icon: FileText, bg: 'linear-gradient(135deg,#fef3c7,#fde68a)' },
+          { v: classAvg(), l: 'Class Average', c: '#059669', Icon: BarChart3, bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)' }].map((s, i) => {
+          const SIcon = s.Icon;
+          return (
+            <motion.div key={i} variants={staggerItem} className="stat-card" whileHover={{ y: -5 }}>
+              <div className="stat-icon" style={{ background: s.bg, color: s.c }}>
+                <SIcon size={22} strokeWidth={2.2} />
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 800, color: s.c, letterSpacing: '-1px' }}>
+                <CountUp value={s.v} decimals={s.v % 1 ? 1 : 0} />
+              </div>
+              <div className="stat-label">{s.l}</div>
+            </motion.div>
+          );
+        })}
       </motion.div>
 
       <div className="glass controls-bar" style={{ padding: 20, marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
@@ -156,21 +162,21 @@ export default function MarksBoard() {
         {exams.length === 0 ? (
           <span style={{ fontSize: 13, color: '#ef4444', fontWeight: 600 }}>No exams configured for this grade. Ask admin to create one.</span>
         ) : selectedExam && (
-          <button onClick={openModal} className="btn btn-primary" style={{ fontSize: 13 }}>
-            ✏️ Enter / Edit Marks
+          <button onClick={openModal} className="btn btn-primary" style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Pencil size={14} /> Enter / Edit Marks
           </button>
         )}
       </div>
 
       {!exams.length ? (
         <div className="glass" style={{ padding: 50, textAlign: 'center' }}>
-          <p style={{ fontSize: 40, marginBottom: 12 }}>📝</p>
+          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}><FileText size={40} color="var(--text-muted)" /></div>
           <p style={{ color: 'var(--text-secondary)', fontSize: 15, marginBottom: 8 }}>No exams configured for this class's grade.</p>
           <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>An admin must create an exam (Admin → Exams tab) and configure subjects for the grade (Admin → Subjects tab) first.</p>
         </div>
       ) : !selectedExam ? (
         <div className="glass" style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ fontSize: 32, marginBottom: 12 }}>📋</p>
+          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}><ClipboardList size={32} color="var(--text-muted)" /></div>
           <p style={{ color: 'var(--text-secondary)', fontSize: 15 }}>Select an exam from the dropdown above.</p>
         </div>
       ) : examData && (
@@ -263,7 +269,7 @@ export default function MarksBoard() {
         <div className="modal-footer">
           <button onClick={closeModal} className="btn btn-secondary">Cancel</button>
           <button onClick={saveMarks} disabled={saving} className="btn btn-primary">
-            {saving ? (<><span className="spin-icon" style={{ marginRight: 8 }}>⟳</span>Saving...</>) : '💾 Save Marks'}
+            {saving ? (<><span className="spin-icon" style={{ marginRight: 8, display: 'inline-flex' }}><Loader2 size={16} /></span>Saving...</>) : <><Save size={16} style={{ marginRight: 6, display: 'inline-flex', verticalAlign: '-2px' }} /> Save Marks</>}
           </button>
         </div>
       </Modal>
@@ -275,7 +281,7 @@ function NoClass() {
   return (
     <Page>
       <div className="glass" style={{ textAlign: 'center', padding: 60, marginTop: 40 }}>
-        <p style={{ fontSize: 48, marginBottom: 16 }}>⚠️</p>
+        <AlertTriangle size={48} color="#d97706" style={{ marginBottom: 16 }} />
         <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No Class Assigned</h3>
         <p style={{ color: 'var(--text-secondary)' }}>Please contact the administrator to assign you a class.</p>
       </div>

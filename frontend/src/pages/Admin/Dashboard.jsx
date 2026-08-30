@@ -1,18 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  TrendingUp, Building2, Library, GraduationCap, Palette, PenLine, Link2,
+  Zap, Sprout, Plus, Check, KeyRound,
+} from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { Page, EASE, SPRING, staggerContainer, staggerItem, statHover } from '../../lib/motion.jsx';
 import { CountUp, Toast } from '../../components/ui.jsx';
 
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: '📈' },
-  { id: 'schools', label: 'Schools', icon: '🏫' },
-  { id: 'classes', label: 'Classes', icon: '📚' },
-  { id: 'students', label: 'Students', icon: '👨‍🎓' },
-  { id: 'subjects', label: 'Subjects', icon: '🎨' },
-  { id: 'exams', label: 'Exams', icon: '📝' },
-  { id: 'assignments', label: 'Assignments', icon: '🔗' },
+  { id: 'overview', label: 'Overview', Icon: TrendingUp },
+  { id: 'schools', label: 'Schools', Icon: Building2 },
+  { id: 'classes', label: 'Classes', Icon: Library },
+  { id: 'students', label: 'Students', Icon: GraduationCap },
+  { id: 'subjects', label: 'Subjects', Icon: Palette },
+  { id: 'exams', label: 'Exams', Icon: PenLine },
+  { id: 'assignments', label: 'Assignments', Icon: Link2 },
 ];
 
 const grades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -59,16 +63,19 @@ export default function AdminDashboard() {
 
       {/* Tab bar */}
       <div className="admin-tabs">
-        {visibleTabs.map(t => (
-          <button key={t.id} className={`admin-tab ${tab === t.id ? 'active' : ''}`}
-            onClick={() => setTab(t.id)}>
-            {tab === t.id && (
-              <motion.span layoutId="tab-pill" className="tab-pill" transition={SPRING} />
-            )}
-            <span className="tab-icon">{t.icon}</span>
-            <span>{t.label}</span>
-          </button>
-        ))}
+        {visibleTabs.map(t => {
+          const TabIcon = t.Icon;
+          return (
+            <button key={t.id} className={`admin-tab ${tab === t.id ? 'active' : ''}`}
+              onClick={() => setTab(t.id)}>
+              {tab === t.id && (
+                <motion.span layoutId="tab-pill" className="tab-pill" transition={SPRING} />
+              )}
+              <span className="tab-icon"><TabIcon size={16} strokeWidth={2.2} /></span>
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="admin-tab-body">
@@ -97,10 +104,10 @@ function Overview({ schools, classes, subjects, accounts, user, onDone, showToas
   const isSuperAdmin = user?.role === 'super_admin';
 
   const stats = [
-    { label: 'Schools', value: schools.length, icon: '🏫', color: '#6366f1', bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
-    { label: 'Classes', value: classes.length, icon: '📚', color: '#10b981', bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)' },
-    { label: 'Subjects', value: subjects.length, icon: '🎨', color: '#f59e0b', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)' },
-    { label: 'Accounts', value: accounts.length, icon: '🔑', color: '#8b5cf6', bg: 'linear-gradient(135deg,#ede9fe,#ddd6fe)' },
+    { label: 'Schools', value: schools.length, Icon: Building2, color: '#6366f1', bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
+    { label: 'Classes', value: classes.length, Icon: Library, color: '#10b981', bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)' },
+    { label: 'Subjects', value: subjects.length, Icon: Palette, color: '#f59e0b', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)' },
+    { label: 'Accounts', value: accounts.length, Icon: KeyRound, color: '#8b5cf6', bg: 'linear-gradient(135deg,#ede9fe,#ddd6fe)' },
   ];
 
   const seedFull = async () => {
@@ -131,21 +138,28 @@ function Overview({ schools, classes, subjects, accounts, user, onDone, showToas
   return (
     <>
       <motion.div variants={staggerContainer} initial="initial" animate="animate" className="stat-grid">
-        {stats.map(s => (
-          <motion.div key={s.label} variants={staggerItem} className="stat-card" {...statHover}>
-            <div className="stat-icon" style={{ background: s.bg, fontSize: 22 }}>{s.icon}</div>
-            <div style={{ fontSize: 36, fontWeight: 800, color: s.color, letterSpacing: '-1px' }}>
-              <CountUp value={s.value} />
-            </div>
-            <div className="stat-label">{s.label}</div>
-          </motion.div>
-        ))}
+        {stats.map(s => {
+          const SIcon = s.Icon;
+          return (
+            <motion.div key={s.label} variants={staggerItem} className="stat-card" {...statHover}>
+              <div className="stat-icon" style={{ background: s.bg, color: s.color }}>
+                <SIcon size={22} strokeWidth={2.2} />
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 800, color: s.color, letterSpacing: '-1px' }}>
+                <CountUp value={s.value} />
+              </div>
+              <div className="stat-label">{s.label}</div>
+            </motion.div>
+          );
+        })}
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.4, ease: EASE }}
         className="glass" style={{ padding: 28, marginTop: 24, textAlign: 'center' }}>
-        <h3 className="section-title" style={{ marginBottom: 4, justifyContent: 'center' }}>⚡ Quick Setup</h3>
+        <h3 className="section-title" style={{ marginBottom: 4, justifyContent: 'center' }}>
+          <Zap size={18} color="var(--accent)" /> Quick Setup
+        </h3>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginTop: 18 }}>
           {isSuperAdmin && (
             <motion.button type="button" onClick={seedFull} disabled={seedingFull}
@@ -158,7 +172,7 @@ function Overview({ schools, classes, subjects, accounts, user, onDone, showToas
                 cursor: seedingFull ? 'wait' : 'pointer', display: 'inline-flex',
                 alignItems: 'center', gap: 10, minWidth: 250,
               }}>
-              {seedingFull ? <><Spinner /> Seeding…</> : <>🌱 Seed Full Demo Data</>}
+              {seedingFull ? <><Spinner /> Seeding…</> : <><Sprout size={18} /> Seed Full Demo Data</>}
             </motion.button>
           )}
           <motion.button type="button" onClick={seedBasic} disabled={seedingBasic}
@@ -169,7 +183,7 @@ function Overview({ schools, classes, subjects, accounts, user, onDone, showToas
               cursor: seedingBasic ? 'wait' : 'pointer', display: 'inline-flex',
               alignItems: 'center', gap: 10, minWidth: 250,
             }}>
-            {seedingBasic ? <><Spinner /> Seeding…</> : <>🌱 Seed Basic (Greenwood)</>}
+            {seedingBasic ? <><Spinner /> Seeding…</> : <><Sprout size={18} /> Seed Basic (Greenwood)</>}
           </motion.button>
         </div>
         <div style={{ marginTop: 14, fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -196,7 +210,7 @@ function SchoolsTab({ schools, onDone, showToast, user }) {
         <form onSubmit={submit} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <input className="input" style={{ flex: 1, minWidth: 220 }} placeholder="School name (e.g. Greenwood High)"
             value={name} onChange={e => setName(e.target.value)} required />
-          <button type="submit" className="btn btn-primary">+ Add School</button>
+          <button type="submit" className="btn btn-primary"><Plus size={16} style={{ display: 'inline-block', verticalAlign: '-2px' }} /> Add School</button>
         </form>
       </div>
       <div className="admin-list">
@@ -205,7 +219,7 @@ function SchoolsTab({ schools, onDone, showToast, user }) {
             <motion.div key={s.id} className="admin-list-item"
               initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 12 }} transition={{ delay: i * 0.04, ease: EASE }} whileHover={{ scale: 1.02 }}>
-              <span className="list-icon">🏫</span>
+              <span className="list-icon"><Building2 size={18} color="var(--accent)" /></span>
               <span style={{ fontWeight: 700 }}>{s.name}</span>
               <span className="list-id">#{s.id}</span>
             </motion.div>
@@ -257,7 +271,7 @@ function ClassesTab({ schools, classes, accounts, onDone, showToast, user }) {
           <Field label="Section"><select className="input" value={section} onChange={e => setSection(e.target.value)}>
             {sectionOptions.map(s => <option key={s} value={s}>{s}</option>)}
           </select></Field>
-          <button type="submit" className="btn btn-primary">+ Add Class</button>
+          <button type="submit" className="btn btn-primary"><Plus size={16} style={{ display: 'inline-block', verticalAlign: '-2px' }} /> Add Class</button>
         </form>
       </div>
       <div className="admin-list">
@@ -267,7 +281,7 @@ function ClassesTab({ schools, classes, accounts, onDone, showToast, user }) {
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }} transition={{ delay: i * 0.03, ease: EASE }} whileHover={{ scale: 1.02 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="list-icon">📚</span>
+                <span className="list-icon"><Library size={18} color="var(--accent)" /></span>
                 <span style={{ fontWeight: 700 }}>{c.label}</span>
                 <span className="pill" style={{ background: '#e0e7ff', color: '#4f7df3', fontSize: 11 }}>
                   {schools.find(s => s.id === c.school_id)?.name || `School #${c.school_id}`}
@@ -342,7 +356,7 @@ function StudentsTab({ schools, classes, onDone, showToast, user }) {
             onChange={e => setName(e.target.value)} required /></Field>
           <Field label="Roll No"><input className="input" style={{ width: 100 }} value={rollNo}
             onChange={e => setRollNo(e.target.value)} /></Field>
-          <button type="submit" className="btn btn-primary">+ Add Student</button>
+          <button type="submit" className="btn btn-primary"><Plus size={16} style={{ display: 'inline-block', verticalAlign: '-2px' }} /> Add Student</button>
         </form>
       </div>
       <div className="admin-list">
@@ -351,7 +365,7 @@ function StudentsTab({ schools, classes, onDone, showToast, user }) {
             <motion.div key={s.id} className="admin-list-item"
               initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.03, ease: EASE }} whileHover={{ scale: 1.02 }}>
-              <span className="list-icon">👨‍🎓</span>
+              <span className="list-icon"><GraduationCap size={18} color="var(--accent)" /></span>
               <span style={{ fontWeight: 600 }}>{s.name}</span>
               <span className="list-id">Roll #{s.roll_no || s.id}</span>
             </motion.div>
@@ -425,7 +439,7 @@ function SubjectsTab({ subjects, schools, onDone, showToast, user }) {
                 style={{ width: 48, height: 40, border: 'none', borderRadius: 8, cursor: 'pointer' }} />
               <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{color}</span>
             </div>
-            <button type="submit" className="btn btn-primary">+ Add Subject</button>
+            <button type="submit" className="btn btn-primary"><Plus size={16} style={{ display: 'inline-block', verticalAlign: '-2px' }} /> Add Subject</button>
           </form>
           <div style={{ marginTop: 20 }}>
             {subjects.map((s, i) => (
@@ -549,7 +563,7 @@ function ExamsTab({ schools, onDone, showToast, user }) {
           <Field label="Exam name"><input className="input" placeholder="e.g. Midterm" value={name} onChange={e => setName(e.target.value)} required /></Field>
           <Field label="Max score"><input type="number" min="1" className="input" style={{ width: 110 }} value={maxScore} onChange={e => setMaxScore(e.target.value)} /></Field>
           <Field label="Term"><input className="input" style={{ width: 130 }} value={term} onChange={e => setTerm(e.target.value)} /></Field>
-          <button type="submit" className="btn btn-primary">+ Create Exam</button>
+          <button type="submit" className="btn btn-primary"><Plus size={16} style={{ display: 'inline-block', verticalAlign: '-2px' }} /> Create Exam</button>
         </form>
       </div>
       <div className="admin-list">
@@ -557,7 +571,7 @@ function ExamsTab({ schools, onDone, showToast, user }) {
           {list.map((e, i) => (
             <motion.div key={e.id} className="admin-list-item"
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03, ease: EASE }} whileHover={{ scale: 1.02 }}>
-              <span className="list-icon">📝</span>
+              <span className="list-icon"><PenLine size={18} color="var(--accent)" /></span>
               <span style={{ fontWeight: 700 }}>{e.name}</span>
               <span className="pill" style={{ background: '#fef3c7', color: '#d97706', fontSize: 11 }}>Grade {e.grade}</span>
               <span className="pill" style={{ background: '#dbeafe', color: '#1e40af', fontSize: 11 }}>Max {e.max_score}</span>
@@ -601,7 +615,7 @@ function AssignmentsTab({ schools, classes, accounts, onDone, showToast, user })
             return (
               <motion.div key={s.id} className="admin-list-item admin-list-item-row" whileHover={{ scale: 1.02 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="list-icon">🏫</span><span style={{ fontWeight: 600 }}>{s.name}</span>
+                  <span className="list-icon"><Building2 size={18} color="var(--accent)" /></span><span style={{ fontWeight: 600 }}>{s.name}</span>
                 </div>
                 <select className="input input-sm" defaultValue={assigned?.id || ''}
                   onChange={e => assignPrincipal(e.target.value, s.id)}>
@@ -630,7 +644,7 @@ function AssignmentsTab({ schools, classes, accounts, onDone, showToast, user })
                     <motion.button key={s.id} type="button" className={`chip ${on ? 'chip-on' : ''}`}
                       whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                       onClick={() => toggleChairSchool(ch.id, s.id, !on)}>
-                      {on ? '✓ ' : ''}{s.name}
+                      {on && <Check size={14} style={{ display: 'inline-block', verticalAlign: '-2px' }} />} {s.name}
                     </motion.button>
                   );
                 })}

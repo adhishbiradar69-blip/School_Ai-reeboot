@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AlertTriangle, Check, X, Circle, FileText, Trash2, ChevronDown, Plus } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { Page, EASE, SPRING, staggerContainer, staggerItem } from '../../lib/motion.jsx';
@@ -57,14 +58,14 @@ export default function TaskManager() {
 
   const getRate = (studs) => !studs.length ? 0 : Math.round(studs.filter(s => s.status === 'completed').length / studs.length * 100);
   const getStatusStyle = (status) => {
-    if (status === 'completed') return { bg: '#d1fae5', color: '#047857', border: '#10b981', label: '✓ Done' };
-    if (status === 'late') return { bg: '#fee2e2', color: '#b91c1c', border: '#ef4444', label: '✗ Late' };
-    return { bg: '#f1f5f9', color: '#64748b', border: '#e2e8f0', label: '○ Pending' };
+    if (status === 'completed') return { bg: '#d1fae5', color: '#047857', border: '#10b981', label: 'Done', Icon: Check };
+    if (status === 'late') return { bg: '#fee2e2', color: '#b91c1c', border: '#ef4444', label: 'Late', Icon: X };
+    return { bg: '#f1f5f9', color: '#64748b', border: '#e2e8f0', label: 'Pending', Icon: Circle };
   };
 
   if (!classId) return (
     <Page><div className="glass" style={{ textAlign: 'center', padding: 60, marginTop: 40 }}>
-      <p style={{ fontSize: 48, marginBottom: 16 }}>⚠️</p>
+      <AlertTriangle size={48} color="#d97706" style={{ marginBottom: 16 }} />
       <h3 style={{ fontSize: 20, fontWeight: 700 }}>No Class Assigned</h3>
       <p style={{ color: 'var(--text-secondary)' }}>Contact administrator.</p>
     </div></Page>
@@ -120,7 +121,7 @@ export default function TaskManager() {
           <div style={{ display: 'flex', gap: 12 }}>
             <button type="button" onClick={() => { setTaskTitle(''); setDueDate(''); setShowForm(false); }} className="btn btn-secondary" style={{ padding: '12px 32px' }}>Cancel</button>
             <motion.button type="submit" className="btn btn-primary" disabled={creating} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{ padding: '12px 32px' }}>
-              {creating ? 'Creating...' : '✓ Create Task'}
+              {creating ? 'Creating...' : <><Check size={16} style={{ marginRight: 6, display: 'inline-flex', verticalAlign: '-2px' }} /> Create Task</>}
             </motion.button>
           </div>
         </form>
@@ -133,12 +134,12 @@ export default function TaskManager() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="page-header"><h2>Tasks</h2><p>Assignments for your class</p></div>
       <div style={{ marginBottom: 28 }}>
-        <motion.button onClick={() => setShowForm(true)} className="btn btn-primary" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{ padding: '12px 28px' }}>+ New Task</motion.button>
+        <motion.button onClick={() => setShowForm(true)} className="btn btn-primary" whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{ padding: '12px 28px', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Plus size={16} /> New Task</motion.button>
       </div>
 
       {tasks.length === 0 ? (
         <motion.div className="glass" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', padding: 60 }}>
-          <motion.p style={{ fontSize: 48, marginBottom: 16 }} animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}>📝</motion.p>
+          <motion.div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }} animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}><FileText size={48} color="var(--text-muted)" /></motion.div>
           <p style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>No tasks yet. Create one above!</p>
         </motion.div>
       ) : (
@@ -166,8 +167,8 @@ export default function TaskManager() {
                       <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Done</div>
                     </div>
                     <motion.button onClick={(e) => { e.stopPropagation(); deleteTask(task.task_id); }} whileHover={{ scale: 1.2 }} whileTap={{ scale: 0.9 }}
-                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: 4, borderRadius: 6 }}>🗑</motion.button>
-                    <motion.span animate={{ rotate: isExpanded ? 180 : 0 }} transition={SPRING} style={{ fontSize: 20, color: 'var(--text-muted)' }}>▼</motion.span>
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} /></motion.button>
+                    <motion.span animate={{ rotate: isExpanded ? 180 : 0 }} transition={SPRING} style={{ display: 'inline-flex', color: 'var(--text-muted)' }}><ChevronDown size={20} /></motion.span>
                   </div>
                 </motion.div>
 
@@ -182,14 +183,15 @@ export default function TaskManager() {
                             <tbody>
                               {task.students.map(s => {
                                 const st = getStatusStyle(s.status);
+                                const StatusIcon = st.Icon;
                                 return (
                                   <tr key={s.id}>
                                     <td style={{ fontWeight: 600 }}>{s.name}</td>
                                     <td style={{ textAlign: 'center' }}>
                                       <motion.button onClick={() => toggleStatus(task.task_id, s.id, s.status)} className="pill"
                                         whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
-                                        style={{ padding: '6px 18px', fontSize: 12, background: st.bg, color: st.color, border: `1.5px solid ${st.border}`, width: 100, fontWeight: 700 }}>
-                                        {st.label}
+                                        style={{ padding: '6px 18px', fontSize: 12, background: st.bg, color: st.color, border: `1.5px solid ${st.border}`, width: 110, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                                        <StatusIcon size={12} strokeWidth={3} /> {st.label}
                                       </motion.button>
                                     </td>
                                   </tr>
