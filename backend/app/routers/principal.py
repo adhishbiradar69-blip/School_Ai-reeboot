@@ -5,12 +5,13 @@ import statistics
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
+from app.rate_limit import limiter
 from app.models.attendance import Attendance
 from app.models.class_ import Class
 from app.models.exam import Exam
@@ -20,7 +21,8 @@ from app.models.school import School
 from app.models.student import Student
 from app.models.subject import Subject
 from app.models.user import User
-from app.services.ai_service import ask_ai
+from app.services.ai_service import ask_ai, ask_ai_agentic
+from app.services.ai_tools import TOOLS as PRINCIPAL_TOOLS
 
 router = APIRouter(prefix="/principal", tags=["principal"])
 _allowed = require_role("principal", "super_admin", "school_admin")
@@ -949,7 +951,7 @@ def _pearson(pairs: list[tuple[float, float]]) -> Optional[float]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AI ANALYZE — Groq → z-ai → fallback
+# AI ANALYZE — Agentic (tool-calling) Groq → z-ai → fallback
 # ─────────────────────────────────────────────────────────────────────────────
 class AnalyzeBody(BaseModel):
     question: str
@@ -957,10 +959,12 @@ class AnalyzeBody(BaseModel):
 
 SYSTEM_PROMPT = (
     "You are an AI assistant for a school principal. You have access to real, "
-    "live school data below. Answer the principal's question in detailed, "
-    "actionable markdown. Use specific numbers, student names, class names, "
-    "and subject names. Highlight improvements needed and suggest concrete "
-    "actions. Use ## headers, **bold**, and - bullet lists."
+    "live school data via tools. When you need specific info (a student's "
+    "details, a grade comparison, the at-risk list, etc.), call a tool by "
+    "responding with ONLY: {\"tool\":\"tool_name\",\"args\":{...}}. After "
+    "getting the tool result, give a detailed markdown answer with specific "
+    "names, numbers, and actionable recommendations. Use ## headers, "
+    "**bold**, and - bullet lists."
 )
 
 
@@ -1047,8 +1051,37 @@ def _build_insights_summary(data: dict) -> dict:
     }
 
 
+def _compact_school_summary(data: dict) -> str:
+    """One-paragraph text snapshot the agentic LLM uses as background context
+    (so it knows the school's shape without having to call a tool first)."""
+    weak = min(data["subjects"], key=lambda s: s["average"])["name"] if data["subjects"] else "?"
+    strong = max(data["subjects"], key=lambda s: s["average"])["name"] if data["subjects"] else "?"
+    top = data.get("top_performer") or {}
+    at_risk_count = sum(1 for st in data["_student_stats"].values()
+                        if st["average"] < 50 or st["attendance_rate"] < 60)
+    grade_summary = ", ".join(
+        f"Grade {g['grade']}: avg {g['average']}% ({g['students']} students)"
+        for g in data["grades"]
+    )
+    subject_summary = ", ".join(
+        f"{s['name']}: {s['average']}%" for s in data["subjects"]
+    )
+    return (
+        f"School: {data['school']['name']} — "
+        f"{data['total_students']} students, {data['total_classes']} classes, "
+        f"{data['total_exams']} exams. "
+        f"School average: {data['school_average']}%. "
+        f"At-risk students: {at_risk_count}. "
+        f"Top performer: {top.get('name', '?')} ({top.get('average', '?')}%). "
+        f"Strongest subject: {strong}. Weakest subject: {weak}. "
+        f"Grades — {grade_summary}. "
+        f"Subjects — {subject_summary}."
+    )
+
+
 @router.post("/ai/analyze")
-async def ai_analyze(body: AnalyzeBody, db: Session = Depends(get_db), user=Depends(_allowed)):
+@limiter.limit("30/minute")
+async def ai_analyze(request: Request, body: AnalyzeBody, db: Session = Depends(get_db), user=Depends(_allowed)):
     question = (body.question or "").strip()
     school = _school_of(user, db)
     data = _gather_school_data(db, school)
@@ -1059,15 +1092,22 @@ async def ai_analyze(body: AnalyzeBody, db: Session = Depends(get_db), user=Depe
             "answer": "Ask me about school performance, top performers, or grade comparisons.",
             "source": "fallback",
             "data_snapshot": snapshot,
+            "tools_used": [],
         }
 
-    result = await ask_ai(
+    # Agentic loop: give the LLM the principal's tool set + the pre-computed
+    # school snapshot so it can answer with specific names and numbers.
+    result = await ask_ai_agentic(
         question=question,
         system_prompt=SYSTEM_PROMPT,
-        data_context=snapshot,
+        db=db,
+        tools=PRINCIPAL_TOOLS,
+        context_summary=_compact_school_summary(data),
+        ctx={"school": school, "_data": data},
     )
     return {
         "answer": result["answer"],
         "source": result["source"],
+        "tools_used": result.get("tools_used", []),
         "data_snapshot": snapshot,
     }

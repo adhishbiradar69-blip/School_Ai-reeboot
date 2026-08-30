@@ -1496,6 +1496,20 @@ tr:last-child td {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 18px;
 }
+/* Duo layout — 2 members, centered, roomier cards */
+.team-grid-duo {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 320px));
+  justify-content: center;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.team-grid-duo .team-card { padding: 32px 28px; gap: 8px; }
+.team-grid-duo .team-avatar {
+  width: 80px; height: 80px;
+  margin-bottom: 14px;
+}
+.team-grid-duo .team-name { font-size: 17px; }
+.team-grid-duo .team-role { font-size: 13px; }
 .team-card {
   padding: 24px; border-radius: 16px; text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 6px;

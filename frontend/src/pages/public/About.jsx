@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import { Target, Heart, Shield, Compass, Users, Building2 } from 'lucide-react';
+import { Target, Heart, Shield, Compass, Code2, Palette } from 'lucide-react';
 import { EASE } from '../../lib/motion.jsx';
 
-/* SchoolAI about page — company story, mission, values, team placeholder. */
+/* SchoolAI about page — company story, mission, values, team. */
 const VALUES = [
   { Icon: Compass, title: 'Mission-driven', body: 'We exist to give every educator the tools to spot struggling students early — and to celebrate the ones who shine.' },
   { Icon: Heart, title: 'Human-first', body: 'Software should respect teachers\' time. Every interaction is tuned to reduce clicks, not add them.' },
@@ -11,10 +11,8 @@ const VALUES = [
 ];
 
 const TEAM = [
-  { name: 'Aarav Sharma', role: 'Founder & CEO', Icon: Users },
-  { name: 'Priya Nair', role: 'Head of Engineering', Icon: Building2 },
-  { name: 'Rohit Gupta', role: 'Head of Design', Icon: Compass },
-  { name: 'Ananya Reddy', role: 'Customer Success', Icon: Heart },
+  { name: 'Adhish',  role: 'Lead Developer & Maintainer', Icon: Code2 },
+  { name: 'Kishor',  role: 'Designer, Vision & Legal',     Icon: Palette },
 ];
 
 const field = (delay) => ({
@@ -82,9 +80,9 @@ export default function About() {
       <section className="about-team">
         <motion.div className="section-headline" {...field(0.1)}>
           <h2>The team</h2>
-          <p>A small group of educators, engineers, and designers.</p>
+          <p>Built by a focused duo.</p>
         </motion.div>
-        <div className="team-grid">
+        <div className="team-grid team-grid-duo">
           {TEAM.map((t, i) => {
             const TIcon = t.Icon;
             return (

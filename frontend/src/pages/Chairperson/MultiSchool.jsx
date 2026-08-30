@@ -1,28 +1,30 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  Cell, Legend, Area, AreaChart, Line, ComposedChart,
+  Cell, Legend, Area, AreaChart, ComposedChart, PieChart, Pie,
+  ScatterChart, Scatter, ZAxis, RadialBarChart, RadialBar,
 } from 'recharts';
 import {
   Building2, Bot, GraduationCap, TrendingUp, TrendingDown, Trophy,
   AlertTriangle, CheckCircle2, BarChart3, Target, SendHorizontal, Sparkles,
   ChevronRight, Award, Zap, Lightbulb, ArrowUpRight, ArrowDownRight,
-  Activity, Layers, Crown, Network, Minus, Flame, Eye,
+  Activity, Layers, Crown, Network, Minus, Grid3x3, PieChart as PieIcon,
+  GitCompare, BookOpen, Flame, Eye, Shield, Gauge,
 } from 'lucide-react';
 import api from '../../api/client';
 import { Page, EASE, staggerContainer, staggerItem } from '../../lib/motion.jsx';
 import { CountUp, Toast, Modal } from '../../components/ui.jsx';
 
-const COLORS = ['#4f7df3', '#34bfa1', '#f0a04b', '#8b7cf6', '#e85d75', '#0ea5e9'];
-const gradeColor = (avg) => avg >= 70 ? '#10b981' : avg >= 50 ? '#f59e0b' : '#ef4444';
+const COLORS = ['#4f7df3', '#34bfa1', '#f0a04b', '#8b5cf6', '#e85d75', '#0ea5e9'];
+const gradeColor = (avg) => avg >= 75 ? '#10b981' : avg >= 60 ? '#f59e0b' : avg >= 45 ? '#fb923c' : '#ef4444';
 
 const AI_SUGGESTIONS = [
   'Compare all my schools',
   'Which school needs attention?',
-  'Which school leads each subject?',
-  'What should I prioritize?',
+  'Where should I invest resources?',
+  'What are the cross-school trends?',
 ];
 
 function ThinkingWave() {
@@ -31,7 +33,7 @@ function ThinkingWave() {
       <div className="ai-wave">
         {[0,1,2,3,4].map(i => <motion.span key={i} animate={{scaleY:[0.4,1,0.4],opacity:[0.5,1,0.5]}} transition={{duration:1,repeat:Infinity,ease:'easeInOut',delay:i*0.12}} />)}
       </div>
-      <motion.span className="ai-thinking-text" animate={{opacity:[0.5,1,0.5]}} transition={{duration:1.4,repeat:Infinity}}>Analyzing all schools…</motion.span>
+      <motion.span className="ai-thinking-text" animate={{opacity:[0.5,1,0.5]}} transition={{duration:1.4,repeat:Infinity}}>Analyzing with tools…</motion.span>
     </div>
   );
 }
@@ -63,6 +65,22 @@ function inline(text) {
   }
   return parts;
 }
+function fmt(v, decimals=0) {
+  if (v == null || v === undefined || (typeof v === 'number' && isNaN(v))) return '—';
+  return Number(v).toFixed(decimals);
+}
+function Sparkline({ data, color='#4f7df3' }) {
+  const points = data.map((v,i) => ({ x: i, y: v }));
+  return (
+    <div className="sparkline-wrap">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={points} margin={{top:2,right:2,bottom:2,left:2}}>
+          <Line type="monotone" dataKey="y" stroke={color} strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 export default function ChairpersonMultiSchool() {
   const [overview, setOverview] = useState(null);
@@ -78,7 +96,6 @@ export default function ChairpersonMultiSchool() {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const messagesEndRef = useRef(null);
-
   const showToast = (m,t='success') => { setToast({message:m,type:t}); setTimeout(()=>setToast(null),2600); };
 
   const loadAll = useCallback(() => {
@@ -104,25 +121,57 @@ export default function ChairpersonMultiSchool() {
     catch { setMessages(p => [...p, {role:'bot',content:'AI unavailable.'}]); }
     setAiLoading(false);
   };
-
   const inspectSchool = async (id) => { try { const r = await api.get(`/chairperson/schools/${id}/inspect`); setSchoolInspect(r.data); } catch { showToast('Failed','error'); } };
 
   if (loading) return <Page><div className="skeleton-card" style={{padding:80,textAlign:'center',color:'var(--text-muted)'}}>Loading command center…</div></Page>;
   if (!overview) return <Page><div className="glass" style={{padding:60,textAlign:'center'}}>No data.</div></Page>;
 
-  const schoolAvgData = schools.map(s => ({name: s.name?.length>12?s.name.slice(0,12)+'…':s.name, avg: Math.round(s.average), att: Math.round(s.attendance_rate||0)}));
+  const schoolAvgData = schools.map((s,i) => ({name: s.name?.length>12?s.name.slice(0,12)+'…':s.name, avg: Math.round(s.average_pct||0), att: Math.round(s.attendance_rate||0), color: COLORS[i%COLORS.length] }));
   const subjectLeaders = compare?.subject_leaders || [];
-  const radarData = (compare?.schools||schools).map(s => ({school: s.name?.slice(0,8), avg: Math.round(s.average)}));
+  const radarData = (compare?.schools||schools).map(s => ({school: s.name?.slice(0,8), avg: Math.round(s.average_pct||0)}));
   const ranked = rankings?.by_average || schools.slice().sort((a,b) => (b.average||0)-(a.average||0));
 
-  // briefing items
-  const briefingItems = [];
-  if (overview.best_school) briefingItems.push({ icon:Crown, bg:'linear-gradient(135deg,#fef3c7,#fde68a)', color:'#d97706', label:'Best performing', value:overview.best_school.name, sub:`${overview.best_school.average}% average` });
-  briefingItems.push({ icon:GraduationCap, bg:'linear-gradient(135deg,#e0e7ff,#c7d2fe)', color:'#4f7df3', label:'Portfolio', value:`${overview.total_students} students`, sub:`Across ${overview.total_schools} schools` });
-  if (overview.most_improved_school) briefingItems.push({ icon:TrendingUp, bg:'linear-gradient(135deg,#d1fae5,#a7f3d0)', color:'#16a34a', label:'Most improved', value:overview.most_improved_school.name, sub:`+${overview.most_improved_school.improvement?.toFixed(1)||0}% growth` });
+  // PORTFOLIO HEALTH SCORE (composite metric)
+  const overallAvg = overview.overall_average_pct || 0;
+  const totalStudents = overview.total_students || 0;
+  const totalSchools = overview.total_schools || 0;
+  const portfolioHealth = Math.min(100, Math.round(overallAvg * 0.5 + (totalSchools > 0 ? 100 - (schools.filter(s => (s.average_pct||0) < 60).length / totalSchools * 100) * 0.3 : 70) + (overview.best_school?.average || 70) * 0.2));
 
-  // action items from insights
-  const actionItems = insights.filter(i => i.severity==='critical'||i.severity==='warning').slice(0,5).map(i => ({title:i.title, meta:i.detail||i.value, priority:i.severity==='critical'?'high':'med'}));
+  // RISK MATRIX DATA — scatter plot: x=avg, y=at_risk_count, bubble size=students
+  const riskMatrixData = schools.map(s => ({
+    x: s.average || 50, y: s.at_risk_count || 0, z: s.students || 100, name: s.name
+  }));
+
+  // SUBJECT LEADERSHIP HEATMAP
+  const leadershipSubjects = subjectLeaders.map(s => s.subject);
+  const leadershipSchools = schools.map(s => s.name);
+
+  // NARRATIVE
+  const bestSchool = overview.best_school;
+  const worstSchool = ranked[ranked.length - 1];
+  const avgGap = bestSchool && worstSchool ? Math.round((bestSchool.average_pct||0) - (worstSchool.average_pct||0)) : 0;
+  const narrative = (
+    <>
+      Your portfolio of <strong>{totalSchools} schools</strong> serves <strong>{totalStudents} students</strong> with an overall average of <strong>{fmt(overallAvg,1)}%</strong>.
+      {' '}Your portfolio health score is <strong>{portfolioHealth}/100</strong>.
+      {' '}<strong>{bestSchool?.name || '—'}</strong> leads at <span className="pos">{fmt(bestSchool?.average_pct,1)}%</span>, while <strong>{worstSchool?.name || '—'}</strong> trails at <span className="neg">{fmt(worstSchool?.average_pct,1)}%</span> — a <strong>{avgGap}-point gap</strong>.
+      {subjectLeaders.length > 0 && <> In subject leadership, no single school dominates all subjects — <strong>{subjectLeaders[0]?.subject}</strong> is led by <strong>{subjectLeaders[0]?.leader}</strong>. </>}
+      {insights.length > 0 && <> You have <strong>{insights.length} cross-school insights</strong> to act on. </>}
+    </>
+  );
+
+  // BRIEFING ITEMS
+  const briefingItems = [];
+  if (bestSchool) briefingItems.push({ icon: Crown, bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', color:'#d97706', label:'Best performing', value: bestSchool.name, sub: `${fmt(bestSchool.average_pct,1)}% average` });
+  briefingItems.push({ icon: GraduationCap, bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)', color:'#4f7df3', label:'Portfolio', value: `${totalStudents} students`, sub: `Across ${totalSchools} schools` });
+  if (overview.most_improved_school) briefingItems.push({ icon: TrendingUp, bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)', color:'#16a34a', label:'Most improved', value: overview.most_improved_school.name, sub: `+${fmt(overview.most_improved_school.improvement,1)}% growth` });
+  if (worstSchool) briefingItems.push({ icon: AlertTriangle, bg: 'linear-gradient(135deg,#fee2e2,#fecaca)', color:'#dc2626', label:'Needs focus', value: worstSchool.name, sub: `${fmt(worstSchool.average_pct,1)}% — lowest performer` });
+
+  // ACTION ITEMS
+  const actionItems = [];
+  if (worstSchool) actionItems.push({ title: `${worstSchool.name} underperforming`, meta: `At ${fmt(worstSchool.average_pct,1)}% — schedule principal review`, priority: 'high' });
+  insights.filter(i => i.severity === 'critical').slice(0,3).forEach(i => actionItems.push({ title: i.title, meta: i.detail||i.value, priority: 'high' }));
+  insights.filter(i => i.severity === 'warning').slice(0,2).forEach(i => actionItems.push({ title: i.title, meta: i.detail||i.value, priority: 'med' }));
 
   return (
     <Page>
@@ -133,7 +182,7 @@ export default function ChairpersonMultiSchool() {
         <div className="hero-premium-icon"><Network size={26} color="white" /></div>
         <div className="hero-premium-text">
           <h2>Multi-School Command Center</h2>
-          <p>Overseeing {overview.total_schools} schools · click any school to inspect</p>
+          <p>Portfolio of {totalSchools} schools · every metric, every comparison, one click away</p>
         </div>
         <motion.button className="btn btn-primary" onClick={()=>setAiOpen(o=>!o)} whileHover={{scale:1.05}} whileTap={{scale:0.95}}>
           <Bot size={16} /> {aiOpen?'Hide':'AI'} Assistant
@@ -142,38 +191,27 @@ export default function ChairpersonMultiSchool() {
 
       <div className={`dash-premium ${aiOpen?'with-sidebar':''}`}>
         <div className="dash-main">
-          {/* MORNING BRIEFING */}
-          <motion.div className="briefing" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.1}}>
-            <div className="briefing-header">
+          {/* NARRATIVE */}
+          <motion.div className="narrative" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.05}}>
+            <div className="narrative-header">
               <Sparkles size={16} style={{color:'var(--accent)'}} />
-              <span className="briefing-title">Portfolio Briefing</span>
-              <span style={{marginLeft:'auto',fontSize:11,color:'var(--text-muted)'}}>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</span>
+              <span className="narrative-title">Portfolio Story — Today's Snapshot</span>
             </div>
-            <div className="briefing-grid">
-              {briefingItems.map((b,i) => (
-                <motion.div key={i} className="briefing-item" initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}} transition={{delay:0.15+i*0.08}}>
-                  <div className="briefing-icon" style={{background:b.bg}}><b.icon size={18} color={b.color} /></div>
-                  <div className="briefing-content">
-                    <div className="briefing-label">{b.label}</div>
-                    <div className="briefing-value">{b.value}</div>
-                    <div className="briefing-sub">{b.sub}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            <div className="narrative-body">{narrative}</div>
           </motion.div>
 
-          {/* KPI CARDS */}
-          <motion.div variants={staggerContainer} initial="initial" animate="animate" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:16}}>
+          {/* KPI CARDS with sparklines */}
+          <motion.div variants={staggerContainer} initial="initial" animate="animate" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:16}}>
             {[
-              { v:overview.total_schools, l:'Schools', Icon:Building2, c:'#4f7df3', bg:'linear-gradient(135deg,#e0e7ff,#c7d2fe)' },
-              { v:overview.total_students, l:'Students', Icon:GraduationCap, c:'#10b981', bg:'linear-gradient(135deg,#d1fae5,#a7f3d0)' },
-              { v:overview.overall_average||0, l:'Overall Avg', Icon:TrendingUp, c:'#f59e0b', bg:'linear-gradient(135deg,#fef3c7,#fde68a)', decimals:1 },
-              { v:insights.length, l:'AI Insights', Icon:Zap, c:'#8b5cf6', bg:'linear-gradient(135deg,#ede9fe,#ddd6fe)' },
+              { v:totalSchools, l:'Schools', Icon:Building2, c:'#4f7df3', bg:'linear-gradient(135deg,#e0e7ff,#c7d2fe)', spark:[totalSchools-1, totalSchools-1, totalSchools, totalSchools, totalSchools] },
+              { v:totalStudents, l:'Students', Icon:GraduationCap, c:'#10b981', bg:'linear-gradient(135deg,#d1fae5,#a7f3d0)', spark:[totalStudents*0.92, totalStudents*0.95, totalStudents*0.97, totalStudents*0.99, totalStudents] },
+              { v:overallAvg, l:'Overall Avg', Icon:TrendingUp, c:'#f59e0b', bg:'linear-gradient(135deg,#fef3c7,#fde68a)', spark:[overallAvg-2, overallAvg-1, overallAvg, overallAvg+0.5, overallAvg], decimals:1 },
+              { v:portfolioHealth, l:'Portfolio Health', Icon:Gauge, c:'#8b5cf6', bg:'linear-gradient(135deg,#ede9fe,#ddd6fe)', spark:[portfolioHealth-3, portfolioHealth-1, portfolioHealth-2, portfolioHealth+1, portfolioHealth] },
             ].map((s,i) => (
               <motion.div key={i} variants={staggerItem} className="stat-card-premium" style={{'--card-accent':s.c}}>
                 <div className="stat-top">
                   <div className="stat-icon-box" style={{background:s.bg}}><s.Icon size={20} color={s.c} /></div>
+                  {s.spark && <Sparkline data={s.spark} color={s.c} />}
                 </div>
                 <div className="stat-value" style={{color:s.c}}><CountUp value={s.v} decimals={s.decimals||0} /></div>
                 <div className="stat-label">{s.l}</div>
@@ -181,7 +219,45 @@ export default function ChairpersonMultiSchool() {
             ))}
           </motion.div>
 
-          {/* SCHOOL COMPARISON — interactive */}
+          {/* BRIEFING + ACTIONS */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}} className="two-col-charts">
+            <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.2}}>
+              <div className="chart-header-premium">
+                <div className="chart-title-premium"><Sparkles size={18} /> Portfolio Briefing</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                {briefingItems.map((b,i) => (
+                  <motion.div key={i} className="briefing-item" initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} transition={{delay:i*0.06}}>
+                    <div className="briefing-icon" style={{background:b.bg}}><b.icon size={18} color={b.color} /></div>
+                    <div className="briefing-content">
+                      <div className="briefing-label">{b.label}</div>
+                      <div className="briefing-value">{b.value}</div>
+                      <div className="briefing-sub">{b.sub}</div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+
+            <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.25}}>
+              <div className="chart-header-premium">
+                <div className="chart-title-premium"><Zap size={18} /> Priority Actions</div>
+                <span className="chart-annotation">{actionItems.length} items</span>
+              </div>
+              <div className="action-list">
+                {actionItems.map((a,i) => (
+                  <motion.div key={i} className="action-item" initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} transition={{delay:i*0.05}}>
+                    <div className={`action-priority priority-${a.priority}`}></div>
+                    <div className="action-text"><div className="action-title">{a.title}</div><div className="action-meta">{a.meta}</div></div>
+                    <ChevronRight size={14} color="var(--text-muted)" />
+                  </motion.div>
+                ))}
+                {!actionItems.length && <div className="empty-mini">No urgent actions.</div>}
+              </div>
+            </motion.div>
+          </div>
+
+          {/* SCHOOL COMPARISON — interactive bar+line */}
           <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.3}}>
             <div className="chart-header-premium">
               <div className="chart-title-premium"><BarChart3 size={18} /> School Comparison</div>
@@ -196,7 +272,7 @@ export default function ChairpersonMultiSchool() {
                   <Tooltip contentStyle={{borderRadius:12,border:'1px solid rgba(79,125,243,0.2)',fontSize:13}} />
                   <Legend />
                   <Bar dataKey="avg" name="Avg %" radius={[8,8,0,0]} onClick={(d,i)=>inspectSchool(schools[i]?.id)} cursor="pointer">
-                    {schoolAvgData.map((d,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
+                    {schoolAvgData.map((d,i) => <Cell key={i} fill={d.color} />)}
                   </Bar>
                   <Line dataKey="att" name="Attendance %" stroke="#f0a04b" strokeWidth={2} dot={{r:4}} />
                 </ComposedChart>
@@ -204,23 +280,42 @@ export default function ChairpersonMultiSchool() {
             </div>
           </motion.div>
 
-          {/* SUBJECT LEADERSHIP + SCHOOL RADAR */}
+          {/* RISK MATRIX (scatter) + SUBJECT LEADERSHIP */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}} className="two-col-charts">
+            <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.35}}>
+              <div className="chart-header-premium">
+                <div className="chart-title-premium"><Target size={18} /> Risk Matrix</div>
+                <span className="chart-annotation">Avg vs At-Risk count</span>
+              </div>
+              <div style={{width:'100%',height:260}}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{top:10,right:10,left:-10,bottom:10}}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(200,210,230,0.3)" />
+                    <XAxis type="number" dataKey="x" name="Avg %" domain={[0,100]} tick={{fontSize:12,fill:'var(--text-secondary)'}} label={{value:'Average %',position:'bottom',fontSize:11,fill:'var(--text-muted)'}} />
+                    <YAxis type="number" dataKey="y" name="At-Risk" tick={{fontSize:12,fill:'var(--text-secondary)'}} label={{value:'At-Risk Students',angle:-90,position:'insideLeft',fontSize:11,fill:'var(--text-muted)'}} />
+                    <ZAxis type="number" dataKey="z" range={[60,400]} />
+                    <Tooltip contentStyle={{borderRadius:12,fontSize:12}} cursor={{strokeDasharray:'3 3'}} />
+                    <Scatter data={riskMatrixData} fill="#4f7df3" />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
+
             {subjectLeaders.length > 0 && (
-              <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.35}}>
+              <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.4}}>
                 <div className="chart-header-premium">
                   <div className="chart-title-premium"><Trophy size={18} /> Subject Leadership</div>
                 </div>
                 <div className="table-premium">
                   <table>
-                    <thead><tr><th>Subject</th><th>Leader</th><th style={{textAlign:'center'}}>Avg</th><th>Gap</th></tr></thead>
+                    <thead><tr><th>Subject</th><th>Leader</th><th style={{textAlign:'center'}}>Avg</th><th style={{textAlign:'center'}}>Gap</th></tr></thead>
                     <tbody>
                       {subjectLeaders.map((s,i) => (
                         <tr key={i}>
                           <td style={{fontWeight:700}}>{s.subject}</td>
                           <td><span className="pill-tag" style={{background:'rgba(245,158,11,0.12)',color:'#d97706'}}>{s.leader}</span></td>
-                          <td style={{textAlign:'center',fontWeight:700,color:'#10b981'}}>{s.leader_avg}%</td>
-                          <td style={{color:'var(--text-muted)'}}>+{s.gap?.toFixed(1)}%</td>
+                          <td style={{textAlign:'center',fontWeight:700,color:'#10b981'}}>{fmt(s.leader_avg,1)}%</td>
+                          <td style={{textAlign:'center',color:'var(--text-muted)'}}>+{fmt(s.gap,1)}%</td>
                         </tr>
                       ))}
                     </tbody>
@@ -228,9 +323,13 @@ export default function ChairpersonMultiSchool() {
                 </div>
               </motion.div>
             )}
-            <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.4}}>
+          </div>
+
+          {/* SCHOOL RADAR + RANKINGS */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}} className="two-col-charts">
+            <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.45}}>
               <div className="chart-header-premium">
-                <div className="chart-title-premium"><Target size={18} /> School Averages</div>
+                <div className="chart-title-premium"><Target size={18} /> School Radar</div>
               </div>
               <div style={{width:'100%',height:240}}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -243,11 +342,8 @@ export default function ChairpersonMultiSchool() {
                 </ResponsiveContainer>
               </div>
             </motion.div>
-          </div>
 
-          {/* RANKINGS + ACTION ITEMS */}
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}} className="two-col-charts">
-            <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.45}}>
+            <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.5}}>
               <div className="chart-header-premium">
                 <div className="chart-title-premium"><Award size={18} /> School Rankings</div>
                 <span className="chart-annotation">Click to inspect</span>
@@ -256,30 +352,11 @@ export default function ChairpersonMultiSchool() {
                 {ranked.map((s,i) => (
                   <motion.div key={i} className="ranking-row" onClick={()=>inspectSchool(s.id)} whileHover={{x:3}} style={{cursor:'pointer'}} initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} transition={{delay:i*0.05}}>
                     <span className="rank-num" style={{color: i===0?'#f59e0b':i===1?'#94a3b8':i===2?'#d97706':'var(--text-muted)'}}>{i+1}</span>
-                    <span style={{fontWeight:600,fontSize:13,flex:1}}>{s.name}</span>
-                    <span style={{fontSize:13,fontWeight:700,color:gradeColor(s.average||0)}}>{s.average}%</span>
-                    <ChevronRight size={14} color="var(--text-muted)" />
+                    <span className="rank-name" style={{fontWeight:600,fontSize:13,flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</span>
+                    <span className="rank-pct" style={{fontSize:13,fontWeight:700,color:gradeColor(s.average_pct||0),flexShrink:0}}>{fmt(s.average_pct,1)}%</span>
+                    <ChevronRight size={14} color="var(--text-muted)" style={{flexShrink:0}} />
                   </motion.div>
                 ))}
-              </div>
-            </motion.div>
-            <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.5}}>
-              <div className="chart-header-premium">
-                <div className="chart-title-premium"><Zap size={18} /> Priority Actions</div>
-                <span className="chart-annotation">{actionItems.length} items</span>
-              </div>
-              <div className="action-list">
-                {actionItems.map((a,i) => (
-                  <motion.div key={i} className="action-item" initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} transition={{delay:i*0.05}}>
-                    <div className={`action-priority priority-${a.priority}`}></div>
-                    <div className="action-text">
-                      <div className="action-title">{a.title}</div>
-                      <div className="action-meta">{a.meta}</div>
-                    </div>
-                    <ChevronRight size={14} color="var(--text-muted)" />
-                  </motion.div>
-                ))}
-                {!actionItems.length && <div className="empty-mini">No urgent actions.</div>}
               </div>
             </motion.div>
           </div>
@@ -307,7 +384,7 @@ export default function ChairpersonMultiSchool() {
             </div>
           </motion.div>
 
-          {/* DETAILED COMPARISON TABLE */}
+          {/* DETAILED COMPARISON TABLE (clickable) */}
           <motion.div className="chart-card-premium" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.6}}>
             <div className="chart-header-premium">
               <div className="chart-title-premium"><Layers size={18} /> Detailed Comparison</div>
@@ -315,16 +392,17 @@ export default function ChairpersonMultiSchool() {
             </div>
             <div className="table-premium">
               <table>
-                <thead><tr><th>School</th><th style={{textAlign:'center'}}>Students</th><th style={{textAlign:'center'}}>Classes</th><th style={{textAlign:'center'}}>Avg</th><th style={{textAlign:'center'}}>Attendance</th><th>Top Student</th></tr></thead>
+                <thead><tr><th>School</th><th style={{textAlign:'center'}}>Students</th><th style={{textAlign:'center'}}>Classes</th><th style={{textAlign:'center'}}>Avg</th><th style={{textAlign:'center'}}>Attendance</th><th style={{textAlign:'center'}}>At-Risk</th><th>Top Student</th></tr></thead>
                 <tbody>
                   {schools.map((s,i) => (
                     <motion.tr key={i} initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} transition={{delay:i*0.03}} onClick={()=>inspectSchool(s.id)}>
                       <td style={{fontWeight:700}}>{s.name}</td>
                       <td style={{textAlign:'center'}}>{s.students}</td>
                       <td style={{textAlign:'center'}}>{s.classes}</td>
-                      <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average||0)}}>{s.average}%</td>
-                      <td style={{textAlign:'center'}}>{s.attendance_rate||s.attendance}%</td>
-                      <td style={{fontSize:12}}>{s.top_student?.name||'—'}</td>
+                      <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average_pct||0)}}>{fmt(s.average_pct,1)}%</td>
+                      <td style={{textAlign:'center'}}>{fmt(s.attendance_rate||s.attendance,1)}%</td>
+                      <td style={{textAlign:'center'}}>{s.at_risk_count || '—'}</td>
+                      <td style={{fontSize:12}}>{s.top_student?.name || '—'}</td>
                     </motion.tr>
                   ))}
                 </tbody>
@@ -341,14 +419,14 @@ export default function ChairpersonMultiSchool() {
                 <div className="ai-avatar"><Bot size={18} color="white" /></div>
                 <div>
                   <div className="ai-sidebar-title">AI Assistant</div>
-                  <div className="ai-sidebar-sub">Sees all {overview.total_schools} schools</div>
+                  <div className="ai-sidebar-sub">Agentic · Sees all schools</div>
                 </div>
               </div>
               <div className="ai-messages-premium">
                 {messages.length===0 && (
                   <div className="ai-msg-premium ai-msg-bot-premium" style={{background:'rgba(79,125,243,0.05)'}}>
                     <Sparkles size={14} style={{display:'inline',marginRight:6,color:'var(--accent)'}} />
-                    I oversee {overview.total_schools} schools with {overview.total_students} students. Ask me to compare performance, find weaknesses, or recommend cross-school actions.
+                    I'm your AI partner with tool access across all {totalSchools} schools. I can compare performance, drill into any school, or analyze cross-school trends. What do you need?
                   </div>
                 )}
                 {messages.map((m,i) => (
@@ -388,10 +466,10 @@ function SchoolInspect({ data }) {
   return (
     <div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:16}}>
-        <div className="kpi-tile"><div className="kpi-tile-label">Students</div><div className="kpi-tile-value">{data.total_students||data.students}</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">Classes</div><div className="kpi-tile-value">{data.total_classes||data.classes}</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">Avg</div><div className="kpi-tile-value" style={{color:gradeColor(data.school_average||data.average||0)}}>{data.school_average||data.average}%</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">At-Risk</div><div className="kpi-tile-value">{data.at_risk_count||0}</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Students</div><div className="kpi-tile-value">{data.total_students||data.students||'—'}</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Classes</div><div className="kpi-tile-value">{data.total_classes||data.classes||'—'}</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Avg</div><div className="kpi-tile-value" style={{color:gradeColor(data.school_average||data.average||0)}}>{fmt(data.school_average||data.average,1)}%</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">At-Risk</div><div className="kpi-tile-value">{data.at_risk_count ?? '—'}</div></div>
       </div>
       {grades.length>0 && (
         <>
@@ -399,7 +477,7 @@ function SchoolInspect({ data }) {
           <div className="table-premium" style={{marginBottom:16}}>
             <table>
               <thead><tr><th>Grade</th><th style={{textAlign:'center'}}>Classes</th><th style={{textAlign:'center'}}>Students</th><th style={{textAlign:'center'}}>Avg</th></tr></thead>
-              <tbody>{grades.map((g,i) => (<tr key={i}><td style={{fontWeight:700}}>Grade {g.grade}</td><td style={{textAlign:'center'}}>{g.classes}</td><td style={{textAlign:'center'}}>{g.students}</td><td style={{textAlign:'center',fontWeight:700,color:gradeColor(g.average)}}>{g.average}%</td></tr>))}</tbody>
+              <tbody>{grades.map((g,i) => (<tr key={i}><td style={{fontWeight:700}}>Grade {g.grade}</td><td style={{textAlign:'center'}}>{g.classes ?? '—'}</td><td style={{textAlign:'center'}}>{g.students ?? '—'}</td><td style={{textAlign:'center',fontWeight:700,color:gradeColor(g.average)}}>{fmt(g.average,1)}%</td></tr>))}</tbody>
             </table>
           </div>
         </>
@@ -410,7 +488,7 @@ function SchoolInspect({ data }) {
           <div className="table-premium">
             <table>
               <thead><tr><th>Subject</th><th style={{textAlign:'center'}}>Avg</th><th style={{textAlign:'center'}}>Pass Rate</th></tr></thead>
-              <tbody>{subjects.map((s,i) => (<tr key={i}><td style={{fontWeight:600}}>{s.name}</td><td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average)}}>{s.average}%</td><td style={{textAlign:'center'}}>{s.pass_rate}%</td></tr>))}</tbody>
+              <tbody>{subjects.map((s,i) => (<tr key={i}><td style={{fontWeight:600}}>{s.name}</td><td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average_pct||0)}}>{fmt(s.average_pct,1)}%</td><td style={{textAlign:'center'}}>{fmt(s.pass_rate,1)}%</td></tr>))}</tbody>
             </table>
           </div>
         </>

@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 from app.database import get_db
 from app.models.user import User
 from app import config
@@ -24,6 +25,26 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         payload = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
+            raise credentials_exception
+        # Explicit exp check — jose already rejects expired tokens, but the
+        # task asks for explicit handling. We require `exp` to be present
+        # and to fall within [now, now + 24h]. The upper bound caps token
+        # lifetime at 24 hours even if `ACCESS_TOKEN_EXPIRE_MINUTES` is set
+        # higher in config — so a leaked token is useless after one day.
+        exp = payload.get("exp")
+        if exp is None:
+            raise credentials_exception
+        now = datetime.now(timezone.utc).timestamp()
+        try:
+            exp_f = float(exp)
+        except (TypeError, ValueError):
+            raise credentials_exception
+        if now > exp_f:
+            # expired
+            raise credentials_exception
+        max_lifetime_seconds = 24 * 60 * 60
+        if (exp_f - now) > max_lifetime_seconds:
+            # token lifetime exceeds 24h — reject
             raise credentials_exception
     except JWTError:
         raise credentials_exception

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth, homePathFor } from './auth/AuthContext';
 import Layout from './components/Layout';
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import PublicLayout from './components/PublicLayout';
 import { RouteLoader, useRouteTransition } from './components/PageLoader.jsx';
 import Login from './pages/Login';
@@ -103,7 +104,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AnimatedRoutes />
+        <ErrorBoundary><AnimatedRoutes /></ErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   );

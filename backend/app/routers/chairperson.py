@@ -5,17 +5,19 @@ import statistics
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import require_role
+from app.rate_limit import limiter
 from app.models.school import School
 from app.models.user import User
 from app.models.user_school import UserSchool
 from app.routers.principal import _gather_school_data  # reuse the heavy one-shot helper
-from app.services.ai_service import ask_ai
+from app.services.ai_service import ask_ai, ask_ai_agentic
+from app.services.ai_tools import CHAIRPERSON_TOOLS
 
 router = APIRouter(prefix="/chairperson", tags=["chairperson"])
 _allowed = require_role("chairperson", "super_admin")
@@ -495,10 +497,12 @@ class AnalyzeBody(BaseModel):
 
 SYSTEM_PROMPT = (
     "You are an AI assistant for a chairperson overseeing multiple schools. "
-    "You have live data for all schools below. Answer in detailed markdown "
-    "with specific school names, numbers, and comparisons. Highlight which "
-    "schools need attention and why. Suggest concrete cross-school actions. "
-    "Use ## headers, **bold**, and - bullet lists."
+    "You have tools to query live data across your portfolio. When you need "
+    "specific info, call a tool by responding with ONLY: "
+    "{\"tool\":\"tool_name\",\"args\":{...}}. After getting the result, give "
+    "a detailed markdown answer with specific school names, numbers, and "
+    "comparisons. Highlight which schools need attention and why. Suggest "
+    "concrete cross-school actions. Use ## headers, **bold**, and - bullet lists."
 )
 
 
@@ -535,8 +539,36 @@ def _build_chair_snapshot(per_school: dict[int, dict], schools: list[School]) ->
     }
 
 
+def _compact_portfolio_summary(schools: list[School], per_school: dict[int, dict]) -> str:
+    """One-paragraph text snapshot of the chairperson's portfolio."""
+    if not schools:
+        return "No schools overseen."
+    entries = []
+    total_students = 0
+    weighted_avg_sum = 0.0
+    for s in schools:
+        data = per_school[s.id]
+        weak = min(data["subjects"], key=lambda x: x["average"])["name"] if data["subjects"] else "?"
+        strong = max(data["subjects"], key=lambda x: x["average"])["name"] if data["subjects"] else "?"
+        at_risk = sum(1 for st in data["_student_stats"].values()
+                      if st["average"] < 50 or st["attendance_rate"] < 60)
+        entries.append(
+            f"{s.name} (avg {data['school_average']}%, "
+            f"{data['total_students']} students, "
+            f"{at_risk} at-risk, strong: {strong}, weak: {weak})"
+        )
+        total_students += data["total_students"]
+        weighted_avg_sum += data["school_average"] * data["total_students"]
+    overall = round(weighted_avg_sum / total_students, 1) if total_students else 0.0
+    return (
+        f"Portfolio: {len(schools)} schools, {total_students} students total, "
+        f"overall average {overall}%. Schools — " + "; ".join(entries) + "."
+    )
+
+
 @router.post("/ai/analyze")
-async def ai_analyze(body: AnalyzeBody, db: Session = Depends(get_db), user=Depends(_allowed)):
+@limiter.limit("30/minute")
+async def ai_analyze(request: Request, body: AnalyzeBody, db: Session = Depends(get_db), user=Depends(_allowed)):
     question = (body.question or "").strip()
     schools = _schools_of(user, db)
     if not schools:
@@ -549,15 +581,23 @@ async def ai_analyze(body: AnalyzeBody, db: Session = Depends(get_db), user=Depe
             "answer": "Ask me to compare your schools, identify which needs attention, or summarize performance.",
             "source": "fallback",
             "data_snapshot": snapshot,
+            "tools_used": [],
         }
 
-    result = await ask_ai(
+    # Agentic loop: the chairperson's tools operate across ALL overseen
+    # schools. We pass `schools=[...]` plus the pre-computed per_school dict
+    # (wrapped so ai_tools can extract it) via `ctx`.
+    result = await ask_ai_agentic(
         question=question,
         system_prompt=SYSTEM_PROMPT,
-        data_context=snapshot,
+        db=db,
+        tools=CHAIRPERSON_TOOLS,
+        context_summary=_compact_portfolio_summary(schools, per_school),
+        ctx={"schools": schools, "_data": {"per_school": per_school}},
     )
     return {
         "answer": result["answer"],
         "source": result["source"],
+        "tools_used": result.get("tools_used", []),
         "data_snapshot": snapshot,
     }

@@ -31,8 +31,9 @@ const VARS = {
   midnight: {
     '--bg': '#0f172a',
     '--bg-gradient': 'linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)',
-    '--bg-card': 'rgba(30,41,59,0.7)',
+    '--bg-card': 'rgba(30,41,59,0.85)',   // more opaque — glass cards were muddy on dark bg
     '--bg-solid': '#1e293b',
+    '--bg-hover': '#334155',
     '--border': 'rgba(148,163,184,0.18)',
     '--border-strong': '#334155',
     '--text-primary': '#f1f5f9',
@@ -42,6 +43,9 @@ const VARS = {
     '--accent-light': '#93c5fd',
     '--accent-glow': 'rgba(96,165,250,0.18)',
     '--accent-gradient': 'linear-gradient(135deg,#3b82f6 0%,#60a5fa 50%,#818cf8 100%)',
+    '--shadow-sm': '0 2px 8px rgba(0,0,0,0.3)',
+    '--shadow': '0 8px 32px rgba(0,0,0,0.4)',
+    '--shadow-lg': '0 16px 48px rgba(0,0,0,0.5)',
   },
   emerald: {
     '--bg': '#f0fdf4',
@@ -114,6 +118,9 @@ export function ThemeProvider({ children }) {
     const vars = VARS[theme] || VARS.aurora;
     const root = document.documentElement;
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+    // Set data-theme on <html> so CSS can theme components that need a
+    // solid background in dark themes (e.g. midnight) — see motion.css.
+    root.setAttribute('data-theme', theme);
     localStorage.setItem('schoolai-theme', theme);
   }, [theme]);
 
