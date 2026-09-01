@@ -18,7 +18,14 @@ import AdminDashboard from './pages/Admin/Dashboard';
 import AdminStudents from './pages/Admin/Students';
 import AccountCreation from './pages/Admin/Accounts';
 import PrincipalDashboard from './pages/Principal/Dashboard';
+import PrincipalStudents from './pages/Principal/Students';
+import PrincipalGrades from './pages/Principal/Grades';
+import PrincipalAtRisk from './pages/Principal/AtRisk';
+import PrincipalSubjects from './pages/Principal/Subjects';
+import PrincipalCompare from './pages/Principal/Compare';
 import ChairpersonMultiSchool from './pages/Chairperson/MultiSchool';
+import ChairpersonRankings from './pages/Chairperson/Rankings';
+import ChairpersonCompare from './pages/Chairperson/Compare';
 import ParentChildView from './pages/Parent/ChildView';
 
 const A = ['super_admin', 'school_admin', 'admin']; // admin roles
@@ -88,8 +95,22 @@ function AnimatedRoutes() {
             <ProtectedRoute roles={A}><AccountCreation /></ProtectedRoute>} />
           <Route path="/principal/dashboard" element={
             <ProtectedRoute roles={['principal', ...A]}><PrincipalDashboard /></ProtectedRoute>} />
+          <Route path="/principal/students" element={
+            <ProtectedRoute roles={['principal', ...A]}><PrincipalStudents /></ProtectedRoute>} />
+          <Route path="/principal/grades" element={
+            <ProtectedRoute roles={['principal', ...A]}><PrincipalGrades /></ProtectedRoute>} />
+          <Route path="/principal/at-risk" element={
+            <ProtectedRoute roles={['principal', ...A]}><PrincipalAtRisk /></ProtectedRoute>} />
+          <Route path="/principal/subjects" element={
+            <ProtectedRoute roles={['principal', ...A]}><PrincipalSubjects /></ProtectedRoute>} />
+          <Route path="/principal/compare" element={
+            <ProtectedRoute roles={['principal', ...A]}><PrincipalCompare /></ProtectedRoute>} />
           <Route path="/chairperson/dashboard" element={
             <ProtectedRoute roles={['chairperson', ...A]}><ChairpersonMultiSchool /></ProtectedRoute>} />
+          <Route path="/chairperson/rankings" element={
+            <ProtectedRoute roles={['chairperson', ...A]}><ChairpersonRankings /></ProtectedRoute>} />
+          <Route path="/chairperson/compare" element={
+            <ProtectedRoute roles={['chairperson', ...A]}><ChairpersonCompare /></ProtectedRoute>} />
           <Route path="/parent/view" element={
             <ProtectedRoute roles={['parent', ...A]}><ParentChildView /></ProtectedRoute>} />
 

@@ -573,7 +573,7 @@ export default function PrincipalDashboard() {
 
       {/* DRILL-DOWN MODALS */}
       <Modal open={!!gradeInspect} onClose={()=>setGradeInspect(null)} title={gradeInspect?`Grade ${gradeInspect.grade} — Inspection`:''} wide>
-        {gradeInspect && <GradeInspect data={gradeInspect} onClassClick={inspectClass} />}
+        {gradeInspect && <GradeInspect data={gradeInspect} onClassClick={inspectClass} onStudentClick={viewStudent} />}
       </Modal>
       <Modal open={!!classInspect} onClose={()=>setClassInspect(null)} title={classInspect?`${classInspect.label} — Class Inspection`:''} wide>
         {classInspect && <ClassInspect data={classInspect} onStudentClick={viewStudent} />}
@@ -585,44 +585,264 @@ export default function PrincipalDashboard() {
   );
 }
 
-function GradeInspect({ data, onClassClick }) {
-  const sections = data.sections || data.classes || [];
-  const subjectMatrix = data.subject_comparison || data.subject_averages || [];
+function GradeInspect({ data, onClassClick, onStudentClick }) {
+  const sections = data.sections || [];
+  const subjectMatrix = data.subject_comparison || [];
+  const topStudents = data.top_students || [];
+  const bottomStudents = data.bottom_students || [];
   return (
     <div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:16}}>
-        <div className="kpi-tile"><div className="kpi-tile-label">Sections</div><div className="kpi-tile-value">{sections.length}</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">Students</div><div className="kpi-tile-value">{data.total_students||data.students_count||'—'}</div></div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:16}}>
+        <div className="kpi-tile"><div className="kpi-tile-label">Sections</div><div className="kpi-tile-value">{data.sections_count ?? sections.length}</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Students</div><div className="kpi-tile-value">{data.total_students ?? '—'}</div></div>
         <div className="kpi-tile"><div className="kpi-tile-label">Grade Avg</div><div className="kpi-tile-value" style={{color:gradeColor(data.grade_average||0)}}>{fmt(data.grade_average,1)}%</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Attendance</div><div className="kpi-tile-value">{fmt(data.attendance_rate,1)}%</div></div>
       </div>
+
       <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Sections — click to inspect class</h4>
       <div className="table-premium" style={{marginBottom:16}}>
         <table>
-          <thead><tr><th>Section</th><th style={{textAlign:'center'}}>Students</th><th style={{textAlign:'center'}}>Avg</th><th style={{textAlign:'center'}}>Attendance</th><th>Top Student</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Section</th>
+              <th style={{textAlign:'center'}}>Students</th>
+              <th style={{textAlign:'center'}}>Avg</th>
+              <th style={{textAlign:'center'}}>Attendance</th>
+              <th style={{textAlign:'center'}}>At Risk</th>
+              <th>Top Student</th>
+              <th>Weakest Subject</th>
+            </tr>
+          </thead>
           <tbody>
             {sections.map((s,i) => (
-              <tr key={i} onClick={()=>onClassClick(s.class_id)}>
-                <td style={{fontWeight:700}}>{s.label||s.section}</td>
-                <td style={{textAlign:'center'}}>{s.student_count||s.students}</td>
-                <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average_percentage||s.average||0)}}>{fmt(s.average_percentage||s.average,1)}%</td>
-                <td style={{textAlign:'center'}}>{s.attendance_rate||s.attendance}%</td>
-                <td style={{fontSize:12}}>{s.top_student?.name||'—'}</td>
+              <tr key={s.class_id ?? i} onClick={()=>onClassClick(s.class_id)}>
+                <td style={{fontWeight:700}}>{s.label || `Grade ${s.grade}-${s.section}`}</td>
+                <td style={{textAlign:'center'}}>{s.students ?? '—'}</td>
+                <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average||0)}}>{fmt(s.average,1)}%</td>
+                <td style={{textAlign:'center'}}>{fmt(s.attendance_rate,1)}%</td>
+                <td style={{textAlign:'center',fontWeight:700,color:(s.at_risk_count||0) > 0 ? '#ef4444' : 'var(--text-muted)'}}>{s.at_risk_count ?? 0}</td>
+                <td style={{fontSize:12}}>{s.top_student?.name || '—'} <span style={{color:'var(--text-muted)'}}>({fmt(s.top_student?.average,1)}%)</span></td>
+                <td style={{fontSize:12}}>
+                  {s.weakest_subject ? (
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                      <span style={{width:8,height:8,borderRadius:'50%',background:s.weakest_subject.color||'var(--accent)',display:'inline-block'}} />
+                      {s.weakest_subject.name} <span style={{color:'var(--text-muted)'}}>({fmt(s.weakest_subject.average,1)}%)</span>
+                    </span>
+                  ) : '—'}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {subjectMatrix.length>0 && (
+
+      {subjectMatrix.length > 0 && (
         <>
           <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Subject comparison across sections</h4>
-          <div className="table-premium">
+          <div className="table-premium" style={{marginBottom:16}}>
             <table>
-              <thead><tr><th>Subject</th>{sections.map((s,i)=><th key={i} style={{textAlign:'center'}}>{s.label||s.section}</th>)}</tr></thead>
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th style={{textAlign:'center'}}>Grade Avg</th>
+                  {sections.map((s,i) => <th key={i} style={{textAlign:'center'}}>{s.section || s.label}</th>)}
+                  <th style={{textAlign:'center'}}>Best</th>
+                  <th style={{textAlign:'center'}}>Worst</th>
+                </tr>
+              </thead>
               <tbody>
                 {subjectMatrix.map((sub,i) => (
-                  <tr key={i}>
-                    <td style={{fontWeight:600}}>{sub.name||sub.subject}</td>
-                    {sections.map((s,j)=><td key={j} style={{textAlign:'center',color:gradeColor(sub[s.label]||sub[s.section]||0)}}>{sub[s.label]||sub[s.section]||'—'}%</td>)}
+                  <tr key={sub.subject_id ?? i}>
+                    <td style={{fontWeight:600}}>
+                      <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                        <span style={{width:8,height:8,borderRadius:'50%',background:sub.color||'var(--accent)',display:'inline-block'}} />
+                        {sub.name}
+                      </span>
+                    </td>
+                    <td style={{textAlign:'center',fontWeight:700,color:gradeColor(sub.grade_average||0)}}>{fmt(sub.grade_average,1)}%</td>
+                    {sections.map((s,j) => {
+                      const v = sub.sections?.[s.section];
+                      return <td key={j} style={{textAlign:'center',color:gradeColor(v||0)}}>{v != null ? `${fmt(v,1)}%` : '—'}</td>;
+                    })}
+                    <td style={{textAlign:'center',fontSize:12,color:'#10b981',fontWeight:700}}>{sub.best_section ? `${sub.best_section.section} (${fmt(sub.best_section.average,1)}%)` : '—'}</td>
+                    <td style={{textAlign:'center',fontSize:12,color:'#ef4444',fontWeight:700}}>{sub.worst_section ? `${sub.worst_section.section} (${fmt(sub.worst_section.average,1)}%)` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {(topStudents.length > 0 || bottomStudents.length > 0) && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          {topStudents.length > 0 && (
+            <div>
+              <h4 style={{margin:'0 0 8px',fontSize:14,fontWeight:700,color:'#10b981'}}>Top performers in grade</h4>
+              <div className="table-premium">
+                <table>
+                  <thead><tr><th>#</th><th>Student</th><th>Class</th><th style={{textAlign:'center'}}>Avg</th></tr></thead>
+                  <tbody>
+                    {topStudents.map((s,i) => (
+                      <tr key={s.student_id ?? i} onClick={()=>onStudentClick && onStudentClick(s.student_id)} style={{cursor:s.student_id?'pointer':'default'}}>
+                        <td style={{textAlign:'center',color:'#10b981',fontWeight:700}}>{i+1}</td>
+                        <td style={{fontWeight:600}}>{s.name}</td>
+                        <td style={{fontSize:12,color:'var(--text-muted)'}}>{s.class_label || '—'}</td>
+                        <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average||0)}}>{fmt(s.average,1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {bottomStudents.length > 0 && (
+            <div>
+              <h4 style={{margin:'0 0 8px',fontSize:14,fontWeight:700,color:'#ef4444'}}>Needs intervention</h4>
+              <div className="table-premium">
+                <table>
+                  <thead><tr><th>#</th><th>Student</th><th>Class</th><th style={{textAlign:'center'}}>Avg</th></tr></thead>
+                  <tbody>
+                    {bottomStudents.map((s,i) => (
+                      <tr key={s.student_id ?? i} style={{cursor:'default'}}>
+                        <td style={{textAlign:'center',color:'#ef4444',fontWeight:700}}>{i+1}</td>
+                        <td style={{fontWeight:600}}>{s.name}</td>
+                        <td style={{fontSize:12,color:'var(--text-muted)'}}>{s.class_label || '—'}</td>
+                        <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average||0)}}>{fmt(s.average,1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClassInspect({ data, onStudentClick }) {
+  const students = data.students || [];
+  const subjectAverages = data.subject_averages || [];
+  const examAverages = data.exam_averages || [];
+  return (
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:16}}>
+        <div className="kpi-tile"><div className="kpi-tile-label">Students</div><div className="kpi-tile-value">{data.students_count ?? students.length}</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Class Avg</div><div className="kpi-tile-value" style={{color:gradeColor(data.class_average||0)}}>{fmt(data.class_average,1)}%</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Attendance</div><div className="kpi-tile-value">{fmt(data.attendance_rate,1)}%</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">At Risk</div><div className="kpi-tile-value" style={{color:(data.at_risk_count||0) > 0 ? '#ef4444' : 'var(--text-primary)'}}>{data.at_risk_count ?? 0}</div></div>
+      </div>
+
+      {(data.top_student || data.bottom_student) && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+          {data.top_student && (
+            <div className="kpi-tile" style={{flexDirection:'row',alignItems:'center',gap:10}}>
+              <Trophy size={18} color="#10b981" />
+              <div>
+                <div className="kpi-tile-label">Top Student</div>
+                <div style={{fontSize:14,fontWeight:700,color:gradeColor(data.top_student.average||0)}}>{data.top_student.name} · {fmt(data.top_student.average,1)}%</div>
+              </div>
+            </div>
+          )}
+          {data.bottom_student && (
+            <div className="kpi-tile" style={{flexDirection:'row',alignItems:'center',gap:10}}>
+              <AlertCircle size={18} color="#ef4444" />
+              <div>
+                <div className="kpi-tile-label">Needs Focus</div>
+                <div style={{fontSize:14,fontWeight:700,color:gradeColor(data.bottom_student.average||0)}}>{data.bottom_student.name} · {fmt(data.bottom_student.average,1)}%</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Students — click for full profile</h4>
+      <div className="table-premium" style={{marginBottom:16}}>
+        <table>
+          <thead>
+            <tr>
+              <th style={{textAlign:'center'}}>Rank</th>
+              <th>Student</th>
+              <th style={{textAlign:'center'}}>Roll</th>
+              <th style={{textAlign:'center'}}>Avg</th>
+              <th style={{textAlign:'center'}}>Attendance</th>
+              <th style={{textAlign:'center'}}>Grade Rank</th>
+              <th>Strongest</th>
+              <th>Weakest</th>
+            </tr>
+          </thead>
+          <tbody>
+            {students.map((s,i) => (
+              <tr key={s.student_id ?? i} onClick={()=>onStudentClick(s.student_id)}>
+                <td style={{textAlign:'center',fontWeight:700}}>#{s.rank_in_class ?? (i+1)}</td>
+                <td style={{fontWeight:600}}>{s.name}</td>
+                <td style={{textAlign:'center',color:'var(--text-muted)'}}>{s.roll_no || '—'}</td>
+                <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average||0)}}>{fmt(s.average,1)}%</td>
+                <td style={{textAlign:'center'}}>{fmt(s.attendance_rate,1)}%</td>
+                <td style={{textAlign:'center',color:'var(--text-secondary)'}}>#{s.rank_in_grade ?? '—'} <span style={{fontSize:11,color:'var(--text-muted)'}}>/{s.grade_size || '—'}</span></td>
+                <td style={{fontSize:12}}>
+                  {s.strongest_subject ? (
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                      <span style={{width:8,height:8,borderRadius:'50%',background:s.strongest_subject.color||'#10b981',display:'inline-block'}} />
+                      {s.strongest_subject.name}
+                    </span>
+                  ) : '—'}
+                </td>
+                <td style={{fontSize:12}}>
+                  {s.weakest_subject ? (
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                      <span style={{width:8,height:8,borderRadius:'50%',background:s.weakest_subject.color||'#ef4444',display:'inline-block'}} />
+                      {s.weakest_subject.name}
+                    </span>
+                  ) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {subjectAverages.length > 0 && (
+        <>
+          <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Subject averages — class</h4>
+          <div className="table-premium" style={{marginBottom:16}}>
+            <table>
+              <thead><tr><th>Subject</th><th style={{textAlign:'center'}}>Average</th><th style={{textAlign:'center'}}>Pass Rate</th></tr></thead>
+              <tbody>
+                {subjectAverages.map((s,i) => (
+                  <tr key={s.subject_id ?? i}>
+                    <td style={{fontWeight:600}}>
+                      <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                        <span style={{width:8,height:8,borderRadius:'50%',background:s.color||'var(--accent)',display:'inline-block'}} />
+                        {s.name}
+                      </span>
+                    </td>
+                    <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average||0)}}>{fmt(s.average,1)}%</td>
+                    <td style={{textAlign:'center',color:(s.pass_rate||0) >= 75 ? '#10b981' : (s.pass_rate||0) >= 50 ? '#f59e0b' : '#ef4444',fontWeight:700}}>{fmt(s.pass_rate,0)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {examAverages.length > 0 && (
+        <>
+          <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Exam averages — class</h4>
+          <div className="table-premium">
+            <table>
+              <thead><tr><th>Exam</th><th>Term</th><th style={{textAlign:'center'}}>Max</th><th style={{textAlign:'center'}}>Average</th><th style={{textAlign:'center'}}>Students</th></tr></thead>
+              <tbody>
+                {examAverages.map((e,i) => (
+                  <tr key={e.exam_id ?? i}>
+                    <td style={{fontWeight:600}}>{e.name}</td>
+                    <td style={{fontSize:12,color:'var(--text-muted)'}}>{e.term || '—'}</td>
+                    <td style={{textAlign:'center'}}>{e.max_score || '—'}</td>
+                    <td style={{textAlign:'center',fontWeight:700,color:gradeColor(e.average||0)}}>{fmt(e.average,1)}%</td>
+                    <td style={{textAlign:'center',color:'var(--text-secondary)'}}>{e.student_count ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -634,76 +854,102 @@ function GradeInspect({ data, onClassClick }) {
   );
 }
 
-function ClassInspect({ data, onStudentClick }) {
-  const students = data.students || [];
-  return (
-    <div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:16}}>
-        <div className="kpi-tile"><div className="kpi-tile-label">Students</div><div className="kpi-tile-value">{students.length}</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">Subjects</div><div className="kpi-tile-value">{(data.subjects||[]).length}</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">Class Avg</div><div className="kpi-tile-value" style={{color:gradeColor(data.average_percentage||data.average||0)}}>{fmt(data.average_percentage||data.average,1)}%</div></div>
-      </div>
-      <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Students — click for full profile</h4>
-      <div className="table-premium">
-        <table>
-          <thead><tr><th>#</th><th>Student</th><th style={{textAlign:'center'}}>Avg</th><th style={{textAlign:'center'}}>Attendance</th><th style={{textAlign:'center'}}>Rank</th></tr></thead>
-          <tbody>
-            {students.map((s,i) => (
-              <tr key={s.student_id||i} onClick={()=>onStudentClick(s.student_id)}>
-                <td style={{textAlign:'center',color:'var(--text-muted)'}}>{i+1}</td>
-                <td style={{fontWeight:600}}>{s.name}</td>
-                <td style={{textAlign:'center',fontWeight:700,color:gradeColor(s.average||0)}}>{fmt(s.average,1)}%</td>
-                <td style={{textAlign:'center'}}>{s.attendance_rate||s.attendance}%</td>
-                <td style={{textAlign:'center',fontWeight:700}}>#{s.rank_in_class||i+1}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 function StudentProfile({ data }) {
-  const marks = data.subject_exam_grid || data.marks || [];
-  const trend = data.improvement_trend || {};
-  const TrendIcon = trend.direction==='improving'?TrendingUp:trend.direction==='declining'?TrendingDown:Minus;
-  const trendColor = trend.direction==='improving'?'#10b981':trend.direction==='declining'?'#ef4444':'#8a92a8';
-  const delta = trend.delta;
-  const deltaStr = (delta != null && !isNaN(delta)) ? `${delta>0?'+':''}${delta.toFixed(1)}%` : '—';
+  const subjects = data.subject_exam_grid || [];
+  const trend = data.improvement_trend || null;
+  const TrendIcon = trend?.direction === 'improving' ? TrendingUp
+                  : trend?.direction === 'declining' ? TrendingDown : Minus;
+  const trendColor = trend?.direction === 'improving' ? '#10b981'
+                   : trend?.direction === 'declining' ? '#ef4444' : '#8a92a8';
+  const delta = trend?.delta;
+  const deltaStr = (delta != null && !isNaN(delta)) ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%` : '—';
+  const attHistory = data.attendance_history || [];
   return (
     <div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:16}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:16}}>
         <div className="kpi-tile"><div className="kpi-tile-label">Average</div><div className="kpi-tile-value" style={{color:gradeColor(data.average||0)}}>{fmt(data.average,1)}%</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">Rank in Class</div><div className="kpi-tile-value">#{data.rank_in_class ?? '—'}</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">Rank in Grade</div><div className="kpi-tile-value">#{data.rank_in_grade ?? '—'}</div></div>
-        <div className="kpi-tile"><div className="kpi-tile-label">Attendance</div><div className="kpi-tile-value">{fmt(data.attendance_rate||data.attendance,1)}%</div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Rank in Class</div><div className="kpi-tile-value">#{data.rank_in_class ?? '—'} <span style={{fontSize:12,color:'var(--text-muted)',fontWeight:600}}>/ {data.class_size ?? '—'}</span></div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Rank in Grade</div><div className="kpi-tile-value">#{data.rank_in_grade ?? '—'} <span style={{fontSize:12,color:'var(--text-muted)',fontWeight:600}}>/ {data.grade_size ?? '—'}</span></div></div>
+        <div className="kpi-tile"><div className="kpi-tile-label">Attendance</div><div className="kpi-tile-value">{fmt(data.attendance_rate,1)}%</div></div>
       </div>
-      {data.class_label && <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16}}>{data.class_label} · Strongest: <strong>{data.strongest_subject?.name || '—'}</strong> ({fmt(data.strongest_subject?.average,1)}%) · Weakest: <strong>{data.weakest_subject?.name || '—'}</strong> ({fmt(data.weakest_subject?.average,1)}%)</p>}
-      {trend.first_avg != null && (
+
+      <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16}}>
+        {data.class_label} · Roll No <strong>{data.roll_no || '—'}</strong> · Strongest: <strong>{data.strongest_subject?.name || '—'}</strong> ({fmt(data.strongest_subject?.average,1)}%) · Weakest: <strong>{data.weakest_subject?.name || '—'}</strong> ({fmt(data.weakest_subject?.average,1)}%) · Variance: <strong>{fmt(data.variance,1)}</strong>
+      </p>
+
+      {trend && (
         <div className="kpi-tile" style={{marginBottom:16,flexDirection:'row',alignItems:'center',gap:10}}>
           <TrendIcon size={20} color={trendColor} />
-          <div><div className="kpi-tile-label">Improvement Trend</div><div style={{fontSize:14,fontWeight:700,color:trendColor}}>{fmt(trend.first_avg,1)}% → {fmt(trend.last_avg,1)}% ({deltaStr} · {trend.direction || '—'})</div></div>
+          <div>
+            <div className="kpi-tile-label">Improvement Trend</div>
+            <div style={{fontSize:14,fontWeight:700,color:trendColor}}>
+              {fmt(trend.first_exam_average,1)}% → {fmt(trend.last_exam_average,1)}% ({deltaStr} · {trend.direction || '—'})
+            </div>
+          </div>
         </div>
       )}
-      {marks.length>0 && (
+
+      {subjects.length > 0 && (
         <>
-          <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Subject × Exam marks</h4>
+          <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Subject × Exam breakdown</h4>
+          <div className="table-premium" style={{marginBottom:16}}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Exam</th>
+                  <th>Term</th>
+                  <th style={{textAlign:'center'}}>Max</th>
+                  <th style={{textAlign:'center'}}>%</th>
+                  <th style={{textAlign:'center'}}>Subject Avg</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subjects.flatMap((sub, si) => {
+                  const scores = sub.scores || [];
+                  const rows = scores.length > 0 ? scores : [{}];
+                  return rows.map((sc, j) => (
+                    <tr key={`${sub.subject_id ?? si}-${j}`}>
+                      {j === 0 ? (
+                        <td rowSpan={rows.length} style={{fontWeight:600,verticalAlign:'top'}}>
+                          <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+                            <span style={{width:8,height:8,borderRadius:'50%',background:sub.color||'var(--accent)',display:'inline-block'}} />
+                            {sub.name}
+                          </span>
+                        </td>
+                      ) : null}
+                      <td style={{fontSize:12}}>{sc.exam_name || '—'}</td>
+                      <td style={{fontSize:12,color:'var(--text-muted)'}}>{sc.term || '—'}</td>
+                      <td style={{textAlign:'center',color:'var(--text-muted)'}}>{sc.max_score ?? '—'}</td>
+                      <td style={{textAlign:'center',fontWeight:700,color:gradeColor(sc.percentage||0)}}>{sc.percentage != null ? `${sc.percentage.toFixed(1)}%` : '—'}</td>
+                      {j === 0 ? (
+                        <td rowSpan={rows.length} style={{textAlign:'center',fontWeight:700,verticalAlign:'top',color:gradeColor(sub.average||0)}}>
+                          {fmt(sub.average,1)}%
+                        </td>
+                      ) : null}
+                    </tr>
+                  ));
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {attHistory.length > 0 && (
+        <>
+          <h4 style={{margin:'16px 0 8px',fontSize:14,fontWeight:700}}>Attendance history</h4>
           <div className="table-premium">
             <table>
-              <thead><tr><th>Subject</th><th>Exam</th><th style={{textAlign:'center'}}>Score</th><th style={{textAlign:'center'}}>Max</th><th style={{textAlign:'center'}}>%</th></tr></thead>
+              <thead><tr><th>Date</th><th style={{textAlign:'center'}}>Status</th></tr></thead>
               <tbody>
-                {marks.map((m,i) => {
-                  const score = m.score || 0;
-                  const max = m.max_score || m.max || 100;
-                  const pct = max > 0 ? (score/max*100) : 0;
+                {attHistory.map((a,i) => {
+                  const status = a.status || '—';
+                  const color = status === 'P' ? '#10b981' : status === 'A' ? '#ef4444' : status === 'L' ? '#f59e0b' : 'var(--text-muted)';
                   return (
                     <tr key={i}>
-                      <td style={{fontWeight:600}}>{m.subject||m.subject_name}</td>
-                      <td>{m.exam||m.exam_name}</td>
-                      <td style={{textAlign:'center'}}>{score}</td>
-                      <td style={{textAlign:'center',color:'var(--text-muted)'}}>{max}</td>
-                      <td style={{textAlign:'center',fontWeight:700,color:gradeColor(pct)}}>{pct.toFixed(0)}%</td>
+                      <td style={{fontSize:12}}>{a.date || '—'}</td>
+                      <td style={{textAlign:'center',fontWeight:700,color}}>{status}</td>
                     </tr>
                   );
                 })}

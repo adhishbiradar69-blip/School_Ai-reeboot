@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 import random
 from passlib.context import CryptContext
 
@@ -25,10 +25,29 @@ from app.dependencies import (
     get_current_user, require_role, require_super_admin, require_school_admin,
     assert_school_access,
 )
-from app.routers.auth import get_password_hash
+from app.routers.auth import get_password_hash, _validate_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Audit logging (Task 10)
+# ─────────────────────────────────────────────────────────────────────────────
+# Every sensitive admin action (account creation, deletion, role assignment,
+# full re-seed) prints a structured line to stdout with an ISO-8601 UTC
+# timestamp, the acting user's email, and the action + target. This is the
+# minimum bar for an audit trail; in production we'd forward this to a SIEM
+# or a dedicated audit table, but for now stdout (which Render captures) is
+# enough to satisfy the "every sensitive action is logged" requirement.
+def _audit(actor_email: str, action: str, **details) -> None:
+    ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # Mask any obviously sensitive payload fields so we never log a password
+    # hash in cleartext. (None of the callers pass one today, but this is
+    # defence-in-depth.)
+    safe = {k: ("***" if k in {"password", "hashed_password"} else v)
+            for k, v in details.items() if v is not None}
+    print(f'[AUDIT] {ts} actor={actor_email!r} action={action!r} {safe}', flush=True)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -258,6 +277,7 @@ def exams_range(body: ExamRange, db: Session = Depends(get_db),
 # ──────────────────────────────────────────────────────────────
 @router.post("/accounts")
 def create_account(data: AccountCreate, db: Session = Depends(get_db), user=Depends(require_super_admin)):
+    _validate_email(data.email)
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     valid_roles = {"class_teacher", "principal", "chairperson", "parent", "school_admin"}
@@ -287,6 +307,12 @@ def create_account(data: AccountCreate, db: Session = Depends(get_db), user=Depe
             student.parent_user_id = new_user.id
             db.commit()
 
+    _audit(
+        user.email, "account.create",
+        target_user_id=new_user.id, target_email=new_user.email,
+        role=new_user.role, school_id=new_user.school_id,
+        assigned_class_id=new_user.assigned_class_id,
+    )
     return {"id": new_user.id, "email": new_user.email, "role": new_user.role,
             "full_name": new_user.full_name}
 
@@ -316,9 +342,15 @@ def delete_account(user_id: int, db: Session = Depends(get_db), current=Depends(
     u = db.query(User).filter(User.id == user_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="Account not found")
+    target_email = u.email
+    target_role = u.role
     db.query(UserSchool).filter(UserSchool.user_id == user_id).delete()
     db.delete(u)
     db.commit()
+    _audit(
+        current.email, "account.delete",
+        target_user_id=user_id, target_email=target_email, target_role=target_role,
+    )
     return {"status": "deleted"}
 
 
@@ -347,6 +379,10 @@ def assign_principal(body: AssignBody, school_id: int, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="User not found")
     u.school_id = school_id
     db.commit()
+    _audit(
+        user.email, "role.assign_principal",
+        target_user_id=u.id, target_email=u.email, school_id=school_id,
+    )
     return {"status": "assigned", "user_id": u.id, "school_id": school_id}
 
 
@@ -361,6 +397,10 @@ def assign_chairperson(body: AssignBody, db: Session = Depends(get_db),
     for sid in ids:
         db.add(UserSchool(user_id=u.id, school_id=sid))
     db.commit()
+    _audit(
+        user.email, "role.assign_chairperson",
+        target_user_id=u.id, target_email=u.email, school_ids=ids,
+    )
     return {"status": "assigned", "user_id": u.id, "school_ids": ids}
 
 
@@ -486,6 +526,7 @@ def _wipe_all(db: Session, keep_user_id: int):
 @router.post("/seed-full")
 def seed_full(db: Session = Depends(get_db), user=Depends(require_super_admin)):
     """Idempotent-ish full seed. Wipes everything except the calling super_admin."""
+    _audit(user.email, "seed_full.start", note="wiping all data + reseeding")
     _wipe_all(db, keep_user_id=user.id)
 
     schools_data = ["Greenwood High", "Sunrise Public School", "Radiant International Academy"]
@@ -680,7 +721,7 @@ def seed_full(db: Session = Depends(get_db), user=Depends(require_super_admin)):
         db_user.assigned_class_id = first_class_id
         db.commit()
 
-    return {
+    result = {
         "schools": len(schools),
         "classes": total_classes,
         "students": total_students,
@@ -693,3 +734,9 @@ def seed_full(db: Session = Depends(get_db), user=Depends(require_super_admin)):
         "principals": [u.email for u in principals],
         "chairperson": chair.email,
     }
+    _audit(
+        user.email, "seed_full.complete",
+        schools=result["schools"], classes=result["classes"],
+        students=result["students"], accounts=result["accounts"],
+    )
+    return result

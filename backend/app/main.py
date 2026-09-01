@@ -38,14 +38,45 @@ app.add_middleware(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Security headers middleware (Task 7-bugs-security #7)
+# Security headers middleware (Task 7-bugs-security #7 + Task 10)
 # ─────────────────────────────────────────────────────────────────────────────
+# Industry-grade header set:
+#   - Content-Security-Policy: restrict every fetch source. Inline scripts +
+#     styles are allowed because Vite injects them during dev, and Google
+#     Fonts CSS is the only 3rd-party stylesheet. Fonts are pulled from
+#     gstatic. Images may come from any HTTPS source (user avatars etc).
+#     connect-src pins fetch/XHR to our own origin + the local dev ports +
+#     any *.onrender.com subdomain so production deploys can talk to each
+#     other.
+#   - Referrer-Policy: strict-origin-when-cross-origin — never leak the full
+#     URL (which may contain query params) to third parties.
+#   - Permissions-Policy: deny camera / microphone / geolocation by default.
+#   - Strict-Transport-Security: HSTS — once a client has seen this over
+#     HTTPS, they will refuse to downgrade to HTTP for a year (incl. subdomains).
+#   - X-Content-Type-Options: nosniff — blocks MIME-sniffing.
+#   - X-Frame-Options: DENY — clickjacking defence (CSP frame-ancestors
+#     would be the modern equivalent; we ship both for defence-in-depth).
+#   - X-XSS-Protection: legacy IE filter, harmless on modern browsers.
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data: https:; "
+    "connect-src 'self' http://localhost:5173 http://localhost:8000 https://*.onrender.com"
+)
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Content-Security-Policy"] = _CSP
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 

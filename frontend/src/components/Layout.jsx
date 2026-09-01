@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClipboardList, CheckSquare, PenLine, BarChart3, Building2, GraduationCap,
   KeyRound, Briefcase, Target, Users, ChevronLeft, ChevronRight, LogOut,
+  BookOpen, AlertTriangle, GitCompare, Award, Search,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { EASE, SPRING } from '../lib/motion.jsx';
@@ -35,13 +36,20 @@ const allNavGroups = [
     roles: ['principal', ...A],
     items: [
       { path: '/principal/dashboard', label: 'Dashboard', icon: Briefcase },
+      { path: '/principal/students', label: 'Students', icon: Search },
+      { path: '/principal/grades', label: 'Grades', icon: BarChart3 },
+      { path: '/principal/subjects', label: 'Subjects', icon: BookOpen },
+      { path: '/principal/at-risk', label: 'At-Risk', icon: AlertTriangle },
+      { path: '/principal/compare', label: 'Compare', icon: GitCompare },
     ]
   },
   {
     label: 'Chairperson',
     roles: ['chairperson', ...A],
     items: [
-      { path: '/chairperson/dashboard', label: 'Multi-School', icon: Target },
+      { path: '/chairperson/dashboard', label: 'Dashboard', icon: Target },
+      { path: '/chairperson/rankings', label: 'Rankings', icon: Award },
+      { path: '/chairperson/compare', label: 'Compare', icon: GitCompare },
     ]
   },
   {

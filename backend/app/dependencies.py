@@ -13,6 +13,14 @@ security = HTTPBearer()
 # schools + accounts), `school_admin` is a school-scoped admin.
 ADMIN_ROLES = ("super_admin", "school_admin")
 
+# Every role the platform recognises. Any JWT whose user has a role outside
+# this set is rejected — even if the row somehow exists in the DB (e.g. an
+# old DB from a previous schema or a hand-edited row).
+ALLOWED_ROLES = frozenset({
+    "super_admin", "school_admin", "principal", "chairperson",
+    "class_teacher", "parent",
+})
+
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     token = credentials.credentials
@@ -23,14 +31,27 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     )
     try:
         payload = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
-        user_id: str = payload.get("sub")
+        user_id = payload.get("sub")
+        # Input validation: `sub` MUST be present and be a valid integer.
+        # We accept either an int or a numeric string (the auth module
+        # encodes it as str(user.id)), but we explicitly reject anything
+        # that isn't an integer (e.g. an email, a UUID, an arbitrary
+        # string). This blocks a class of token-substitution attacks where
+        # a malformed `sub` could be used to confuse downstream lookups.
         if user_id is None:
             raise credentials_exception
-        # Explicit exp check — jose already rejects expired tokens, but the
-        # task asks for explicit handling. We require `exp` to be present
-        # and to fall within [now, now + 24h]. The upper bound caps token
-        # lifetime at 24 hours even if `ACCESS_TOKEN_EXPIRE_MINUTES` is set
-        # higher in config — so a leaked token is useless after one day.
+        try:
+            user_id_int = int(user_id)
+        except (TypeError, ValueError):
+            raise credentials_exception
+        if user_id_int <= 0:
+            raise credentials_exception
+
+        # Explicit exp check — jose already rejects expired tokens, but we
+        # require `exp` to be present and to fall within [now, now + 24h].
+        # The upper bound caps token lifetime at 24 hours even if
+        # `ACCESS_TOKEN_EXPIRE_MINUTES` is set higher in config — so a
+        # leaked token is useless after one day.
         exp = payload.get("exp")
         if exp is None:
             raise credentials_exception
@@ -49,9 +70,19 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except JWTError:
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    user = db.query(User).filter(User.id == user_id_int).first()
     if user is None:
         raise credentials_exception
+
+    # Role allow-list: reject any user whose role isn't one of the known
+    # roles. This is a defence-in-depth check — even if a row exists in
+    # the DB with a typo'd role (e.g. "principla"), we refuse to issue a
+    # session for them.
+    if user.role not in ALLOWED_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account role is not permitted.",
+        )
     return user
 
 

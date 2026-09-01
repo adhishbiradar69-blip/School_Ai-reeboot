@@ -4,6 +4,8 @@ from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 import re
+import time
+from collections import defaultdict
 
 from app.database import get_db
 from app.models.user import User
@@ -22,6 +24,92 @@ pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 ROOT_ADMIN_EMAIL = "root.schoolai@nexus-secure.internal"
 ROOT_ADMIN_PASSWORD = "Tr!umphant-Str@tik-9173"
 ROOT_ADMIN_FULL_NAME = "System Root"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Email validation (Task 10)
+# ─────────────────────────────────────────────────────────────────────────────
+# Reasonable RFC-5322-ish regex — good enough to reject obvious garbage
+# without false-positiving the long tail of valid-but-exotic addresses.
+# We deliberately keep this permissive on the local-part (allows +, ., etc)
+# and strict on the domain (must have at least one dot, no consecutive dots).
+_EMAIL_RE = re.compile(
+    r"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~.\-]+"
+    r"@[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?)+$"
+)
+
+
+def _validate_email(email: str) -> None:
+    """Reject anything that doesn't look like a valid email.
+
+    Raises 400 with a specific message. Used on both /register and /login
+    so attackers can't probe the lockout / login flow with garbage that
+    would otherwise be looked up against the DB.
+    """
+    if not isinstance(email, str) or not email.strip():
+        raise HTTPException(status_code=400, detail="A valid email address is required.")
+    if len(email) > 320:  # RFC 3696 upper bound
+        raise HTTPException(status_code=400, detail="Email address is too long.")
+    if not _EMAIL_RE.match(email.strip()):
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Account lockout (Task 10)
+# ─────────────────────────────────────────────────────────────────────────────
+# After MAX_FAILED_ATTEMPTS failed logins for a given email, the account is
+# locked for LOCKOUT_DURATION_SECONDS. We track this in memory keyed by the
+# (lowercased) email with the timestamp of the 5th failure. Attempts that
+# arrive while the lockout is active are rejected with 423 Locked without
+# even touching the DB. Successful logins + lockout expiry clear the state.
+#
+# This is intentionally in-memory: it's per-process, which is fine for a
+# single-instance Render deployment. For multi-instance we'd move this to
+# Redis, but the principal of "slow the attacker down" still holds.
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_DURATION_SECONDS = 15 * 60
+
+# { email: {"count": int, "locked_until": float|None} }
+_failed_attempts: dict[str, dict] = defaultdict(lambda: {"count": 0, "locked_until": None})
+
+
+def _is_locked(email: str) -> bool:
+    """Return True if `email` is currently in a lockout window.
+
+    Side-effect: if the lockout window has expired, clears the entry so the
+    user can try again.
+    """
+    if not email:
+        return False
+    key = email.lower().strip()
+    state = _failed_attempts.get(key)
+    if not state or state.get("locked_until") is None:
+        return False
+    if time.time() >= state["locked_until"]:
+        # Lockout window expired — reset.
+        _failed_attempts.pop(key, None)
+        return False
+    return True
+
+
+def _record_failed(email: str) -> None:
+    """Increment the failed-attempt counter for `email` and lock if the
+    threshold is crossed. No-op for empty emails."""
+    if not email:
+        return
+    key = email.lower().strip()
+    state = _failed_attempts[key]
+    state["count"] += 1
+    if state["count"] >= MAX_FAILED_ATTEMPTS and state.get("locked_until") is None:
+        state["locked_until"] = time.time() + LOCKOUT_DURATION_SECONDS
+
+
+def _record_success(email: str) -> None:
+    """Clear any pending failed-attempt state for `email`."""
+    if not email:
+        return
+    _failed_attempts.pop(email.lower().strip(), None)
 
 
 def get_password_hash(password):
@@ -102,6 +190,7 @@ def ensure_root_admin(db: Session) -> None:
 @router.post("/register", response_model=Token)
 @limiter.limit("60/minute")
 def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
+    _validate_email(user.email)
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -123,7 +212,24 @@ def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 @limiter.limit("60/minute")
 def login(request: Request, user: UserLogin, db: Session = Depends(get_db)):
+    # Validate email format up-front so garbage input can't even reach the
+    # DB or the lockout table.
+    _validate_email(user.email)
+
+    # Account lockout: if this email has tripped the threshold, reject with
+    # 423 Locked (and a Retry-After hint) without touching the DB. This
+    # means a determined attacker can't brute-force even at 60 req/min.
+    if _is_locked(user.email):
+        raise HTTPException(
+            status_code=423,
+            detail="Too many failed login attempts. Please try again in 15 minutes.",
+        )
+
     db_user = db.query(User).filter(User.email == user.email).first()
     if not db_user or not verify_password(user.password, db_user.hashed_password):
+        _record_failed(user.email)
+        # Use a deliberately generic message so the response doesn't leak
+        # whether the email exists in the DB.
         raise HTTPException(status_code=400, detail="Invalid email or password")
+    _record_success(user.email)
     return _token_for(db_user)

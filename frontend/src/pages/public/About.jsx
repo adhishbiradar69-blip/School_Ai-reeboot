@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
-import { Target, Heart, Shield, Compass, Code2, Palette } from 'lucide-react';
+import { Target, Heart, Shield, Compass, Code2, Palette, Mail, ArrowRight } from 'lucide-react';
 import { EASE } from '../../lib/motion.jsx';
+import { Link } from 'react-router-dom';
 
 /* SchoolAI about page — company story, mission, values, team. */
 const VALUES = [
@@ -103,6 +104,24 @@ export default function About() {
           })}
         </div>
       </section>
+
+      <motion.section className="about-contact glass" {...field(0.15)}>
+        <div className="about-mission-icon">
+          <Mail size={28} color="var(--accent)" />
+        </div>
+        <div>
+          <h2>Get in touch</h2>
+          <p>
+            For general inquiries, support, or legal matters, reach us at
+            <a href="mailto:adhishbiradar69@gmail.com" className="contact-email">
+              adhishbiradar69@gmail.com
+            </a>
+          </p>
+          <Link to="/login" className="contact-cta">
+            Sign in to your account <ArrowRight size={16} />
+          </Link>
+        </div>
+      </motion.section>
     </div>
   );
 }

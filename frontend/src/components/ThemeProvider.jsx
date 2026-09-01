@@ -5,7 +5,6 @@ import { createContext, useContext, useEffect, useState } from 'react';
 
 export const THEMES = [
   { id: 'aurora',  name: 'Aurora',  swatch: 'linear-gradient(135deg,#4f7df3,#8b7cf6)', desc: 'Soft & calm' },
-  { id: 'midnight', name: 'Midnight', swatch: 'linear-gradient(135deg,#1e293b,#475569)', desc: 'Dark focus' },
   { id: 'emerald', name: 'Emerald', swatch: 'linear-gradient(135deg,#059669,#34d399)', desc: 'Growth' },
   { id: 'sunset',  name: 'Sunset',  swatch: 'linear-gradient(135deg,#e85d75,#f0a04b)', desc: 'Warm' },
   { id: 'slate',   name: 'Slate',   swatch: 'linear-gradient(135deg,#334155,#64748b)', desc: 'Pro neutral' },
@@ -27,25 +26,6 @@ const VARS = {
     '--accent-light': '#7aa2f7',
     '--accent-glow': 'rgba(79,125,243,0.12)',
     '--accent-gradient': 'linear-gradient(135deg,#4f7df3 0%,#6b8ef8 40%,#8b7cf6 100%)',
-  },
-  midnight: {
-    '--bg': '#0f172a',
-    '--bg-gradient': 'linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%)',
-    '--bg-card': 'rgba(30,41,59,0.85)',   // more opaque — glass cards were muddy on dark bg
-    '--bg-solid': '#1e293b',
-    '--bg-hover': '#334155',
-    '--border': 'rgba(148,163,184,0.18)',
-    '--border-strong': '#334155',
-    '--text-primary': '#f1f5f9',
-    '--text-secondary': '#cbd5e1',
-    '--text-muted': '#94a3b8',
-    '--accent': '#60a5fa',
-    '--accent-light': '#93c5fd',
-    '--accent-glow': 'rgba(96,165,250,0.18)',
-    '--accent-gradient': 'linear-gradient(135deg,#3b82f6 0%,#60a5fa 50%,#818cf8 100%)',
-    '--shadow-sm': '0 2px 8px rgba(0,0,0,0.3)',
-    '--shadow': '0 8px 32px rgba(0,0,0,0.4)',
-    '--shadow-lg': '0 16px 48px rgba(0,0,0,0.5)',
   },
   emerald: {
     '--bg': '#f0fdf4',
@@ -115,11 +95,16 @@ export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('schoolai-theme') || 'aurora');
 
   useEffect(() => {
+    // Coerce any persisted-but-removed theme (e.g. one that was deprecated)
+    // back to 'aurora' so users never end up on a missing theme.
+    const safeTheme = VARS[theme] ? theme : 'aurora';
+    if (safeTheme !== theme) {
+      setTheme(safeTheme);
+      return;
+    }
     const vars = VARS[theme] || VARS.aurora;
     const root = document.documentElement;
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
-    // Set data-theme on <html> so CSS can theme components that need a
-    // solid background in dark themes (e.g. midnight) — see motion.css.
     root.setAttribute('data-theme', theme);
     localStorage.setItem('schoolai-theme', theme);
   }, [theme]);

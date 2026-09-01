@@ -691,11 +691,14 @@ tr.clickable:hover td { background: rgba(79,125,243,0.04) !important; }
    TASK 7-bugs-security — UI/UX fixes
    ============================================================ */
 
-/* ===== THEME DROPDOWN FIX (#4) =====
+/* ===== THEME DROPDOWN FIX (Task 10) =====
    The trigger lives inside `.theme-selector`. The dropdown must escape its
    parent's overflow (sidebar footer is overflow:hidden when collapsed) and
    float below the trigger, right-aligned, with a high z-index so it isn't
-   hidden behind chart cards, modals, or ambient orbs. */
+   hidden behind chart cards, modals, or ambient orbs.
+   The dropdown is wide enough that long theme names ("Emerald", "Sunset",
+   "Aurora") never get clipped, and the meta column is given enough room
+   so descriptions don't truncate the name. */
 .theme-selector { position: relative; overflow: visible; }
 .theme-dropdown {
   position: absolute !important;
@@ -705,6 +708,9 @@ tr.clickable:hover td { background: rgba(79,125,243,0.04) !important; }
   bottom: auto !important;
   z-index: 1000 !important;
   margin-top: 8px;
+  min-width: 280px !important; max-width: 340px !important;
+  width: max-content;
+  max-width: 320px;
 }
 /* Sidebar footer: trigger is at the bottom of a fixed 100vh sidebar — opening
    downward would push the dropdown off-screen. Open upward instead, but
@@ -712,34 +718,59 @@ tr.clickable:hover td { background: rgba(79,125,243,0.04) !important; }
 .sidebar .theme-dropdown {
   top: auto !important;
   bottom: calc(100% + 8px) !important;
-  right: 16px !important;
-  left: 16px !important;
+  right: 0 !important;
+  left: auto !important;
   margin-top: 0 !important;
   margin-bottom: 8px;
-  min-width: auto !important;
+  min-width: 280px !important; max-width: 340px !important;
 }
-
-/* ===== MIDNIGHT THEME FIX (#5) =====
-   In the dark theme, glass cards + stat/chart cards must use the solid dark
-   background (var(--bg-solid)), not the translucent white glass, otherwise
-   they look muddy. The data-theme attribute is set on <html> by ThemeProvider. */
-[data-theme="midnight"] .glass,
-[data-theme="midnight"] .stat-card-premium,
-[data-theme="midnight"] .chart-card-premium {
-  background: var(--bg-solid) !important;
-  backdrop-filter: none;
+/* Make sure the option rows never clip the theme name. The meta column
+   needs enough width so the name + desc both render fully. */
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.18s var(--ease-butter, cubic-bezier(0.22,1,0.36,1));
 }
-/* Keep the subtle premium glass tint for the briefing / hero strips. */
-[data-theme="midnight"] .briefing,
-[data-theme="midnight"] .hero-premium {
-  background: linear-gradient(135deg, rgba(96,165,250,0.08) 0%, rgba(129,140,248,0.05) 100%) !important;
+.theme-option:hover { background: var(--accent-glow); border-color: var(--border); }
+.theme-option.active { background: var(--accent-glow); border-color: var(--accent-light); }
+.theme-option-swatch {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
-[data-theme="midnight"] .briefing-item,
-[data-theme="midnight"] .action-item {
-  background: rgba(30,41,59,0.6) !important;
+.theme-option-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 160px;
+  overflow: visible;
 }
-[data-theme="midnight"] .ai-msg-bot-premium {
-  background: rgba(96,165,250,0.06) !important;
+.theme-option-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip; flex-shrink: 0;
+  /* explicitly no max-width — name must never be clipped */
+  max-width: none;
+}
+.theme-option-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip; flex-shrink: 0;
+  max-width: none;
 }
 
 /* ============================================================
@@ -972,3 +1003,85 @@ tr.clickable:hover td { background: rgba(79,125,243,0.04) !important; }
   .compare-vs { padding: 8px 0; }
   .distribution-wrap { flex-direction: column; align-items: stretch; }
 }
+
+/* ===== ABOUT CONTACT SECTION ===== */
+.about-contact {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 28px;
+  margin-top: 40px;
+}
+.about-contact h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.about-contact p { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.contact-email {
+  color: var(--accent); font-weight: 600; text-decoration: none; margin-left: 6px;
+}
+.contact-email:hover { text-decoration: underline; }
+.contact-cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 14px; padding: 10px 20px;
+  background: var(--accent-gradient); color: white;
+  border-radius: 10px; font-weight: 600; font-size: 14px;
+  text-decoration: none; transition: all 0.25s var(--ease-butter, cubic-bezier(0.22,1,0.36,1));
+}
+.contact-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(79,125,243,0.35); }
+
+/* ===== PAGE HEADER (professional breadcrumb-style) ===== */
+.page-header-pro {
+  margin-bottom: 28px;
+}
+.page-header-pro h2 {
+  font-size: 28px; font-weight: 800; letter-spacing: -0.5px;
+  color: var(--text-primary); margin-bottom: 6px;
+}
+.page-header-pro p {
+  color: var(--text-secondary); font-size: 14px; font-weight: 500;
+}
+.page-header-pro .breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-muted); margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600;
+}
+.page-header-pro .breadcrumb a {
+  color: var(--text-muted); text-decoration: none; transition: color 0.2s;
+}
+.page-header-pro .breadcrumb a:hover { color: var(--accent); }
+
+/* ===== FILTER BAR PREMIUM ===== */
+.filter-bar-premium {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  padding: 14px 18px;
+  background: var(--bg-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.filter-bar-premium .input, .filter-bar-premium select {
+  width: auto; min-width: 140px; padding: 8px 14px; font-size: 13px;
+}
+
+/* ===== COMPARISON SPLIT VIEW ===== */
+.compare-grid {
+  display: grid; gap: 20px;
+}
+.compare-col {
+  background: var(--bg-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.compare-col-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+}
+.compare-col-title { font-size: 16px; font-weight: 700; }
+
+/* ===== EMPTY STATE PRO ===== */
+.empty-state-pro {
+  text-align: center; padding: 60px 20px;
+}
+.empty-state-pro h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
+.empty-state-pro p { color: var(--text-muted); font-size: 14px; }

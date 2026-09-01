@@ -1111,3 +1111,195 @@ async def ai_analyze(request: Request, body: AnalyzeBody, db: Session = Depends(
         "tools_used": result.get("tools_used", []),
         "data_snapshot": snapshot,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# New endpoints for dedicated pages (Task: more pages + comparison tool)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/students")
+def list_students(
+    grade: int = None,
+    class_id: int = None,
+    search: str = None,
+    sort: str = "average",
+    order: str = "desc",
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    user=Depends(_allowed),
+):
+    """Paginated, filterable student list for the Students explorer page."""
+    school = _school_of(user, db)
+    classes = db.query(Class).filter(Class.school_id == school.id).all()
+    class_ids = [c.id for c in classes]
+    q = db.query(Student).filter(Student.class_id.in_(class_ids))
+    if class_id:
+        q = q.filter(Student.class_id == class_id)
+    elif grade:
+        grade_class_ids = [c.id for c in classes if c.grade == grade]
+        q = q.filter(Student.class_id.in_(grade_class_ids))
+    if search:
+        q = q.filter(Student.name.ilike(f"%{search}%"))
+    # join marks for sorting
+    from app.models.mark import Mark
+    from app.models.exam import Exam
+    from sqlalchemy import func
+
+    # subquery: student average
+    avg_sub = (
+        db.query(
+            Mark.student_id,
+            (func.avg(Mark.score * 100.0 / func.nullif(Exam.max_score, 0))).label("avg_pct"),
+        )
+        .join(Exam, Mark.exam_id == Exam.id)
+        .group_by(Mark.student_id)
+        .subquery()
+    )
+    q = q.outerjoin(avg_sub, Student.id == avg_sub.c.student_id)
+    total = q.count()
+    sort_col = avg_sub.c.avg_pct if sort == "average" else Student.name
+    q = q.order_by(sort_col.desc() if order == "desc" else sort_col.asc())
+    students = q.offset(offset).limit(min(limit, 100)).all()
+    # compute per-student stats
+    out = []
+    for s in students:
+        cls = next((c for c in classes if c.id == s.class_id), None)
+        marks = db.query(Mark).filter(Mark.student_id == s.id).all()
+        exams = db.query(Exam).filter(Exam.school_id == school.id, Exam.grade == (cls.grade if cls else 0)).all()
+        pcts = []
+        for m in marks:
+            ex = next((e for e in exams if e.id == m.exam_id), None)
+            if ex and ex.max_score:
+                pcts.append((m.score / ex.max_score) * 100)
+        avg = round(sum(pcts) / len(pcts), 1) if pcts else 0
+        attendance = db.query(Attendance).filter(Attendance.student_id == s.id).all()
+        present = len([a for a in attendance if a.status == "P"])
+        att_rate = round((present / len(attendance)) * 100, 1) if attendance else 0
+        at_risk = avg < 50 or att_rate < 60
+        out.append({
+            "student_id": s.id, "name": s.name, "roll_no": s.roll_no,
+            "class_id": s.class_id, "class_label": f"Grade {cls.grade}-{cls.section}" if cls else "—",
+            "grade": cls.grade if cls else None,
+            "average": avg, "attendance_rate": att_rate, "at_risk": at_risk,
+        })
+    return {"students": out, "total": total, "limit": limit, "offset": offset}
+
+
+@router.get("/subjects/{subject_id}/deep-dive")
+def subject_deep_dive(subject_id: int, db: Session = Depends(get_db), user=Depends(_allowed)):
+    """Deep dive into one subject: per-grade averages, per-class averages, top/bottom students."""
+    school = _school_of(user, db)
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    classes = db.query(Class).filter(Class.school_id == school.id).all()
+    from app.models.mark import Mark
+    from app.models.exam import Exam
+    from sqlalchemy import func
+
+    # per-grade breakdown
+    grade_data = {}
+    for c in classes:
+        g = c.grade
+        if g not in grade_data:
+            grade_data[g] = {"grade": g, "classes": 0, "students": 0, "average": 0, "_pcts": []}
+        grade_data[g]["classes"] += 1
+    students = db.query(Student).filter(Student.class_id.in_([c.id for c in classes])).all()
+    stu_by_class = {s.id: s for s in students}
+    marks = db.query(Mark).filter(Mark.subject_id == subject_id).all()
+    exams = db.query(Exam).filter(Exam.school_id == school.id).all()
+    exam_by_id = {e.id: e for e in exams}
+    class_averages = []
+    top_students = []
+    bottom_students = []
+    for c in classes:
+        class_stu = [s for s in students if s.class_id == c.id]
+        class_marks = [m for m in marks if stu_by_class.get(m.student_id) and stu_by_class[m.student_id].class_id == c.id]
+        pcts = []
+        for m in class_marks:
+            ex = exam_by_id.get(m.exam_id)
+            if ex and ex.max_score:
+                pcts.append((m.score / ex.max_score) * 100)
+        if pcts:
+            avg = round(sum(pcts) / len(pcts), 1)
+            class_averages.append({
+                "class_id": c.id, "label": f"Grade {c.grade}-{c.section}", "grade": c.grade,
+                "average": avg, "student_count": len(class_stu),
+            })
+            grade_data[c.grade]["_pcts"].extend(pcts)
+            grade_data[c.grade]["students"] += len(class_stu)
+            # per-student avg for this subject
+            stu_pcts = {}
+            for m in class_marks:
+                ex = exam_by_id.get(m.exam_id)
+                if ex and ex.max_score:
+                    stu_pcts.setdefault(m.student_id, []).append((m.score / ex.max_score) * 100)
+            for sid, spcts in stu_pcts.items():
+                s = stu_by_class.get(sid)
+                if s:
+                    savg = round(sum(spcts) / len(spcts), 1)
+                    entry = {"student_id": sid, "name": s.name, "class_label": f"Grade {c.grade}-{c.section}", "average": savg}
+                    top_students.append(entry)
+                    bottom_students.append(entry)
+    top_students.sort(key=lambda x: x["average"], reverse=True)
+    bottom_students.sort(key=lambda x: x["average"])
+    grade_rows = []
+    for g in sorted(grade_data.keys()):
+        d = grade_data[g]
+        avg = round(sum(d["_pcts"]) / len(d["_pcts"]), 1) if d["_pcts"] else 0
+        grade_rows.append({"grade": g, "classes": d["classes"], "students": d["students"], "average": avg})
+    overall_pcts = [p for d in grade_data.values() for p in d["_pcts"]]
+    overall_avg = round(sum(overall_pcts) / len(overall_pcts), 1) if overall_pcts else 0
+    return {
+        "subject": {"id": subject.id, "name": subject.name, "color": subject.color},
+        "school_average": overall_avg,
+        "grade_breakdown": grade_rows,
+        "class_breakdown": sorted(class_averages, key=lambda x: x["average"], reverse=True),
+        "top_students": top_students[:10],
+        "bottom_students": bottom_students[:10],
+    }
+
+
+@router.get("/attendance/analytics")
+def attendance_analytics(db: Session = Depends(get_db), user=Depends(_allowed)):
+    """School-wide attendance analytics: per-grade rates, per-day trends, at-risk-by-attendance."""
+    school = _school_of(user, db)
+    classes = db.query(Class).filter(Class.school_id == school.id).all()
+    class_ids = [c.id for c in classes]
+    students = db.query(Student).filter(Student.class_id.in_(class_ids)).all() if class_ids else []
+    records = db.query(Attendance).filter(
+        Attendance.student_id.in_([s.id for s in students])
+    ).all() if students else []
+    # per-grade
+    grade_map = {c.id: c.grade for c in classes}
+    grade_data = {}
+    for s in students:
+        g = grade_map.get(s.class_id)
+        if g not in grade_data:
+            grade_data[g] = {"grade": g, "total": 0, "present": 0, "absent": 0, "late": 0, "rate": 0, "students": 0}
+        grade_data[g]["students"] += 1
+    for r in records:
+        s = next((st for st in students if st.id == r.student_id), None)
+        if not s: continue
+        g = grade_map.get(s.class_id)
+        if g is None: continue
+        grade_data[g]["total"] += 1
+        if r.status == "P": grade_data[g]["present"] += 1
+        elif r.status == "A": grade_data[g]["absent"] += 1
+        elif r.status == "L": grade_data[g]["late"] += 1
+    grade_rows = []
+    for g in sorted(grade_data.keys()):
+        d = grade_data[g]
+        d["rate"] = round((d["present"] / d["total"]) * 100, 1) if d["total"] else 0
+        grade_rows.append(d)
+    # per-day (last 7 days that have records)
+    from collections import Counter
+    day_counts = Counter()
+    day_present = Counter()
+    for r in records:
+        d = str(r.date)
+        day_counts[d] += 1
+        if r.status == "P": day_present[d] += 1
+    day_rows = [{"date": d, "total": day_counts[d], "present": day_present[d], "rate": round((day_present[d]/day_counts[d])*100,1) if day_counts[d] else 0} for d in sorted(day_counts.keys())[-7:]]
+    return {"grade_breakdown": grade_rows, "daily_trend": day_rows, "total_records": len(records)}
